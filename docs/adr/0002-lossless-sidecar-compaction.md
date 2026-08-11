@@ -14,6 +14,10 @@ Implement compaction as a plugin that produces a narrative RE-TRAC-style summary
 
 Use a configurable hybrid trigger: default soft ratio 0.75, hard ratio 0.90, optional absolute token threshold, model-requested early compaction, manual mode, and off mode. Disable automatic ratio triggers when model capacity is unknown.
 
+Use the active model for narrative compression by default. An optional
+registered `compaction.modelId` may supply the narrative instead; the runtime
+still attaches and validates the live ledger, recent tail, and source boundary.
+
 ## Consequences
 
 ### Positive
@@ -44,4 +48,3 @@ Use a configurable hybrid trigger: default soft ratio 0.75, hard ratio 0.90, opt
 - https://arxiv.org/abs/2602.02486
 - https://developers.openai.com/api/docs/guides/compaction
 - https://platform.claude.com/docs/en/build-with-claude/compaction
-

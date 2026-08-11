@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Zhen-WushuiLingchun/adaptive-toolsmith/assets/registry.schema.json",
+  "title": "CapabilityRegistry",
+  "description": "Index of tools synthesized in this project. Consulted before any new synthesis.",
+  "type": "object",
+  "required": ["schema_version", "tools"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 2 },
+    "tools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["name", "purpose", "path", "entrypoint", "version", "bundle_digest", "qualification", "qualified_at", "registered_at"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Searchable one-liner. This is what a future agent greps."
+        },
+        "keywords": {
+          "type": "array",
+          "description": "Alternative phrasings a future agent might search for.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "path": { "type": "string" },
+        "entrypoint": { "$ref": "#/$defs/entrypoint" },
+        "input_contract": { "type": "string" },
+        "output_contract": { "type": "string" },
+        "validated_on": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "known_limitations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "bundle_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "qualification": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Project-relative path to the digest-bound qualification record."
+        },
+        "qualified_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "registered_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+        }
+      }
+    },
+    "entrypoint": {
+      "type": "object",
+      "required": ["argv", "file"],
+      "additionalProperties": false,
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "file": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

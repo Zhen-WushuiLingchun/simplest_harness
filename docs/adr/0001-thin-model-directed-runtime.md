@@ -14,8 +14,9 @@ Use TypeScript on Node.js 22+ with a single run core and append-only events. Use
 
 Provide an explicit `--yolo` autonomy mode. In this mode workspace-scoped
 mutating tool calls do not require per-call confirmation. It does not disable
-event evidence, secret handling, resource limits, context integrity checks, or
-network/filesystem boundaries, and it is visibly marked in the TUI.
+event evidence, credential references, resource limits, context integrity
+checks, or loopback binding, and it is visibly marked in the TUI. It is not an
+OS sandbox; child commands keep the TMSH process permissions.
 
 ## Consequences
 

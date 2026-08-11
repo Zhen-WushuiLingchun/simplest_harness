@@ -1,18 +1,39 @@
 # TMSH Initial Harness Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Build the smallest runnable model-directed harness with lossless context compaction, compatible tools, a local API, and a usable TUI.
 
 **Architecture:** A TypeScript run core appends typed events and gives registered models a common tool registry. A context-compactor plugin replaces old narrative history only after preserving an immutable scientific ledger. The TUI and HTTP/MCP surfaces are adapters over the same core.
 
-**Tech Stack:** Node.js 22+, TypeScript, pnpm, Vitest, AI SDK provider adapters, official MCP TypeScript SDK, OpenTUI Solid.
+**Tech Stack:** Node.js 22+, TypeScript, pnpm, Vitest, AI SDK provider adapters, official MCP TypeScript SDK, and imperative OpenTUI with an ANSI fallback.
+
+## Implementation record (2026-08-11)
+
+All eight task outcomes are implemented. Actual module names follow the final
+thin-runtime layout (`src/context`, `src/runtime`, `src/api`, and
+`src/tui/app.ts`) rather than every provisional filename below. Notable bounded
+changes from the initial plan:
+
+- Added explicit `confirm`/`yolo` autonomy modes and persistent TUI marking.
+- Added provider-safe reversible tool aliases after the DeepSeek API rejected
+  dotted canonical tool names in a live smoke.
+- Added both MCP client discovery and a `tmsh mcp` stdio control server.
+- Kept imperative OpenTUI as the preferred renderer, but added a tested ANSI
+  fallback because OpenTUI 0.5.1 reported unavailable native FFI under the
+  observed Windows Node 24.14.0 runtime.
+- Added optional `compaction.modelId`; the active model remains the default.
+- Vendored adaptive-toolsmith commit
+  `e81705c081557e057215d9453db47c420a6a0ffa` as dormant source only.
+
+Qualification evidence is recorded in the repository history and delivery
+report; generated `.tmsh/` events and compaction artifacts remain intentionally
+untracked.
 
 ---
 
 ### Task 1: Repository and instruction boundary
 
 **Files:**
+
 - Create: `.gitignore`
 - Create: `LICENSE`
 - Create: `README.md`
@@ -33,6 +54,7 @@
 ### Task 2: Core types, config, and append-only events
 
 **Files:**
+
 - Create: `src/core/types.ts`
 - Create: `src/core/config.ts`
 - Create: `src/core/event-store.ts`
@@ -51,6 +73,7 @@
 ### Task 3: Lossless context-compactor plugin
 
 **Files:**
+
 - Create: `src/plugins/context-compactor/schema.ts`
 - Create: `src/plugins/context-compactor/threshold.ts`
 - Create: `src/plugins/context-compactor/ledger.ts`
@@ -69,6 +92,7 @@
 ### Task 4: Foreground/background process and HTTP tools
 
 **Files:**
+
 - Create: `src/tools/process-tool.ts`
 - Create: `src/tools/http-tool.ts`
 - Test: `tests/tools/process-tool.test.ts`
@@ -84,6 +108,7 @@
 ### Task 5: Models, delegation, MCP, and agent loop
 
 **Files:**
+
 - Create: `src/models/registry.ts`
 - Create: `src/models/gateway.ts`
 - Create: `src/models/fake-provider.ts`
@@ -106,6 +131,7 @@
 ### Task 6: HTTP/SSE API and CLI
 
 **Files:**
+
 - Create: `src/server/server.ts`
 - Create: `src/cli.ts`
 - Test: `tests/integration/api.test.ts`
@@ -120,6 +146,7 @@
 ### Task 7: Minimal OpenTUI client
 
 **Files:**
+
 - Create: `src/tui/app.tsx`
 - Create: `src/tui/client.ts`
 - Create: `src/tui/theme.ts`
@@ -135,6 +162,7 @@
 ### Task 8: Dormant adaptive-toolsmith plugin and final qualification
 
 **Files:**
+
 - Create: `plugins/adaptive-toolsmith/` from pinned local commit `e81705c081557e057215d9453db47c420a6a0ffa`
 - Create: `THIRD_PARTY_NOTICES.md`
 - Modify: `README.md`
@@ -146,4 +174,3 @@
 3. Run the vendored plugin selftest with the available Python runtime and under `-O`.
 4. Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, build, CLI help, fake-model end-to-end, API/curl smoke, MCP smoke, and TUI visual QA.
 5. Inspect `git diff --check`, `git status`, tracked files, and ignored secret paths.
-

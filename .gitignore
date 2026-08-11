@@ -3,6 +3,8 @@ dist/
 coverage/
 *.tsbuildinfo
 *.log
+__pycache__/
+*.py[cod]
 
 .env
 .env.*
@@ -14,4 +16,3 @@ tmsh.local.json
 
 .DS_Store
 Thumbs.db
-

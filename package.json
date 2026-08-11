@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -24,10 +26,18 @@
     "fast-check": "^4.9.0",
     "prettier": "^3.9.6",
     "tsx": "^4.23.11",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.36",
+    "@ai-sdk/openai": "^4.0.36",
+    "@ai-sdk/openai-compatible": "^3.0.28",
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@opentui/core": "^0.5.1",
+    "ai": "^7.0.58",
     "zod": "^4.4.3"
   }
 }

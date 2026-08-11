@@ -43,7 +43,10 @@ export class EventStore {
       this.#emitter(runId).emit("event", event);
       return event;
     });
-    this.#queues.set(runId, current.catch(() => undefined));
+    this.#queues.set(
+      runId,
+      current.catch(() => undefined),
+    );
     return current;
   }
 
@@ -67,7 +70,10 @@ export class EventStore {
     return events;
   }
 
-  public subscribe(runId: string, listener: (event: RunEvent) => void): () => void {
+  public subscribe(
+    runId: string,
+    listener: (event: RunEvent) => void,
+  ): () => void {
     const emitter = this.#emitter(runId);
     emitter.on("event", listener);
     return () => emitter.off("event", listener);
@@ -94,4 +100,3 @@ export class EventStore {
 function isMissing(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
-

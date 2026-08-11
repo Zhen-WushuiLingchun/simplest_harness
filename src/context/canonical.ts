@@ -6,7 +6,9 @@ export function canonicalJson(value: JsonValue): string {
 }
 
 export function sha256Json(value: JsonValue): string {
-  return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+  return createHash("sha256")
+    .update(canonicalJson(value), "utf8")
+    .digest("hex");
 }
 
 function sortJson(value: JsonValue): JsonValue {

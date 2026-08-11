@@ -34,7 +34,9 @@ export class PreservationLedger {
 
   public snapshot(): LedgerSnapshot {
     const sections = emptySections();
-    for (const entry of [...this.#entries.values()].sort((left, right) => left.id.localeCompare(right.id))) {
+    for (const entry of [...this.#entries.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    )) {
       pushEntry(sections, entry);
     }
     const content = { version: 1 as const, sections };
@@ -46,7 +48,8 @@ export class PreservationLedger {
     const replacement = new Map<string, LedgerEntry>();
     for (const category of LEDGER_CATEGORIES) {
       for (const entry of snapshot.sections[category]) {
-        if (replacement.has(entry.id)) throw new Error(`duplicate ledger entry id: ${entry.id}`);
+        if (replacement.has(entry.id))
+          throw new Error(`duplicate ledger entry id: ${entry.id}`);
         replacement.set(entry.id, entry);
       }
     }
@@ -57,18 +60,26 @@ export class PreservationLedger {
 
 export function verifyLedgerSnapshot(input: unknown): LedgerSnapshot {
   const snapshot = ledgerSnapshotSchema.parse(input);
-  const expected = sha256Json({ version: snapshot.version, sections: snapshot.sections } as JsonValue);
+  const expected = sha256Json({
+    version: snapshot.version,
+    sections: snapshot.sections,
+  } as JsonValue);
   if (snapshot.digest !== expected) throw new Error("ledger digest mismatch");
 
   const ids = new Set<string>();
   for (const category of LEDGER_CATEGORIES) {
     const entries = snapshot.sections[category];
-    const sorted = [...entries].sort((left, right) => left.id.localeCompare(right.id));
-    if (canonicalJson(entries as JsonValue) !== canonicalJson(sorted as JsonValue)) {
+    const sorted = [...entries].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    );
+    if (
+      canonicalJson(entries as JsonValue) !== canonicalJson(sorted as JsonValue)
+    ) {
       throw new Error(`ledger section is not sorted: ${category}`);
     }
     for (const entry of entries) {
-      if (ids.has(entry.id)) throw new Error(`duplicate ledger entry id: ${entry.id}`);
+      if (ids.has(entry.id))
+        throw new Error(`duplicate ledger entry id: ${entry.id}`);
       ids.add(entry.id);
     }
   }

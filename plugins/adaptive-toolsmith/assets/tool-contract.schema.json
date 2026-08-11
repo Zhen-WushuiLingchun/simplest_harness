@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Zhen-WushuiLingchun/adaptive-toolsmith/assets/tool-contract.schema.json",
+  "title": "ToolContract",
+  "description": "The interface a synthesized tool commits to. Frozen before implementation.",
+  "type": "object",
+  "required": ["name", "version", "purpose", "entrypoint", "inputs", "outputs"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Lowercase kebab-case identifier, unique within the registry."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 10,
+      "description": "One precise sentence describing the capability."
+    },
+    "keywords": {
+      "type": "array",
+      "description": "Optional search aliases future agents may use when querying the registry.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "entrypoint": {
+      "$ref": "#/$defs/entrypoint"
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Named arguments. Positional arguments are not supported by design.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "enum": ["path", "string", "integer", "number", "boolean", "enum", "json"]
+          },
+          "required": { "type": "boolean", "default": false },
+          "default": {},
+          "values": {
+            "type": "array",
+            "description": "Permitted values when type is 'enum'.",
+            "items": { "type": "string" }
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "required": ["format"],
+      "additionalProperties": false,
+      "properties": {
+        "format": { "enum": ["json", "jsonl", "text", "csv", "binary"] },
+        "destination": { "enum": ["stdout", "file", "both"], "default": "stdout" },
+        "max_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "success_schema": {
+      "type": "object",
+      "description": "Shape of a successful result. Free-form but must be stable across patch versions."
+    },
+    "error_schema": {
+      "type": "object",
+      "description": "Shape of an error result. Should carry a stable machine-matchable code."
+    },
+    "exit_codes": {
+      "type": "object",
+      "description": "Map of exit code to meaning. 0 must mean success.",
+      "propertyNames": { "pattern": "^\\d+$" },
+      "additionalProperties": { "type": "string" }
+    },
+    "side_effects": {
+      "type": "array",
+      "description": "Everything the tool touches beyond reading its inputs. 'none' when pure.",
+      "items": {
+        "enum": ["none", "writes-files", "network", "subprocess", "mutates-input", "credentials"]
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deterministic": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    },
+    "resource_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "max_memory_mb": { "type": "number", "exclusiveMinimum": 0 },
+        "max_output_bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "entrypoint": {
+      "type": "object",
+      "description": "Structured invocation prefix. `file` is bundle-relative and toolsmith requires it exactly once at argv[0] or argv[1].",
+      "required": ["argv", "file"],
+      "additionalProperties": false,
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "file": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

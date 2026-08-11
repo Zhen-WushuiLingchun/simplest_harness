@@ -26,6 +26,7 @@ Do not claim a command, tool, model, API, or TUI path works without running an a
 - Use structured argv for child processes. Shell execution must be explicit.
 - Bound output, waits, timeouts, model calls, and recursion.
 - Keep `--yolo` explicit and visibly active; it bypasses per-tool confirmation,
-  not audit, secret, scope, resource, or context-integrity controls.
+  not audit, secret, user-scope, resource, or context-integrity controls. State
+  clearly that it is not an OS sandbox.
 - Append run evidence before reporting it to a client.
 - Run `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` before delivery.

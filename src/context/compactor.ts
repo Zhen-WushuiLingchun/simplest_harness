@@ -23,7 +23,11 @@ export interface CompactRequest {
 export type Summarizer = (request: CompactRequest) => Promise<unknown>;
 
 export type CompactionResult =
-  | { readonly accepted: true; readonly artifact: CompactionArtifact; readonly artifactPath: string }
+  | {
+      readonly accepted: true;
+      readonly artifact: CompactionArtifact;
+      readonly artifactPath: string;
+    }
   | { readonly accepted: false; readonly reasons: readonly string[] };
 
 export class ContextCompactor {
@@ -47,14 +51,23 @@ export class ContextCompactor {
     try {
       untrusted = await this.#summarize(request);
     } catch (error) {
-      return { accepted: false, reasons: [`summarizer failed: ${messageOf(error)}`] };
+      return {
+        accepted: false,
+        reasons: [`summarizer failed: ${messageOf(error)}`],
+      };
     }
 
-    const checked = validateCompactionCandidate(untrusted, liveLedger, request.source);
+    const checked = validateCompactionCandidate(
+      untrusted,
+      liveLedger,
+      request.source,
+    );
     if (!checked.ok) return { accepted: false, reasons: checked.reasons };
 
     const tailCount = Math.max(0, request.recentTurns * 2);
-    const recentTail = request.messages.slice(Math.max(0, request.messages.length - tailCount));
+    const recentTail = request.messages.slice(
+      Math.max(0, request.messages.length - tailCount),
+    );
     const body = {
       version: 1 as const,
       createdAt: new Date().toISOString(),
@@ -77,7 +90,10 @@ export class ContextCompactor {
     try {
       await writeJsonAtomic(artifactPath, artifact as unknown as JsonValue);
     } catch (error) {
-      return { accepted: false, reasons: [`artifact write failed: ${messageOf(error)}`] };
+      return {
+        accepted: false,
+        reasons: [`artifact write failed: ${messageOf(error)}`],
+      };
     }
     return { accepted: true, artifact, artifactPath };
   }
@@ -87,9 +103,15 @@ export function validateCompactionCandidate(
   input: unknown,
   liveLedger: LedgerSnapshot,
   expectedSource: CompactionSource,
-): { readonly ok: true; readonly candidate: CompactionCandidate } | { readonly ok: false; readonly reasons: string[] } {
+):
+  | { readonly ok: true; readonly candidate: CompactionCandidate }
+  | { readonly ok: false; readonly reasons: string[] } {
   const parsed = compactionCandidateSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, reasons: parsed.error.issues.map((issue) => issue.message) };
+  if (!parsed.success)
+    return {
+      ok: false,
+      reasons: parsed.error.issues.map((issue) => issue.message),
+    };
 
   const reasons: string[] = [];
   try {
@@ -97,16 +119,29 @@ export function validateCompactionCandidate(
   } catch (error) {
     reasons.push(messageOf(error));
   }
-  if (canonicalJson(parsed.data.ledger as JsonValue) !== canonicalJson(liveLedger as JsonValue)) {
+  if (
+    canonicalJson(parsed.data.ledger as JsonValue) !==
+    canonicalJson(liveLedger as JsonValue)
+  ) {
     reasons.push("candidate ledger does not exactly match the live ledger");
   }
-  if (canonicalJson(parsed.data.source as JsonValue) !== canonicalJson(expectedSource as JsonValue)) {
-    reasons.push("candidate source does not match the requested event boundary");
+  if (
+    canonicalJson(parsed.data.source as JsonValue) !==
+    canonicalJson(expectedSource as JsonValue)
+  ) {
+    reasons.push(
+      "candidate source does not match the requested event boundary",
+    );
   }
-  return reasons.length === 0 ? { ok: true, candidate: parsed.data } : { ok: false, reasons };
+  return reasons.length === 0
+    ? { ok: true, candidate: parsed.data }
+    : { ok: false, reasons };
 }
 
-export async function writeJsonAtomic(path: string, value: JsonValue): Promise<void> {
+export async function writeJsonAtomic(
+  path: string,
+  value: JsonValue,
+): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.${randomUUID()}.tmp`;
   const handle = await open(temporary, "wx");

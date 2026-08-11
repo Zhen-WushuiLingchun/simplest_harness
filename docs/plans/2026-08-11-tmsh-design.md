@@ -49,12 +49,12 @@ The run core is an event loop, not a workflow engine. A model response may emit 
 ### YOLO autonomy mode
 
 `--yolo` is an explicit, visible permission mode in which the model may invoke
-workspace-scoped mutating tools continuously without per-call confirmation. It
-changes approval behavior, not evidence or containment: event logging, secret
-redaction, output limits, context-ledger validation, loopback binding, and
-configured filesystem/process boundaries remain active. The TUI must display
-YOLO state persistently. The default remains `confirm` so activation is an
-intentional user choice.
+configured mutating and external tools continuously without per-call
+confirmation. It changes approval behavior, not event logging, credential
+references, output limits, context-ledger validation, or loopback binding. It
+is not an OS sandbox: child commands retain the TMSH process permissions. The
+TUI must display YOLO state persistently. The default remains `confirm` so
+activation is an intentional user choice.
 
 ## Model-directed scheduling
 
@@ -78,7 +78,7 @@ soft_trigger = user.tokens ?? floor(usable_input * user.ratio ?? 0.75)
 hard_trigger = floor(usable_input * user.hard_ratio ?? 0.90)
 ```
 
-Modes are `auto`, `manual`, and `off`. In `auto`, the model may invoke `context.compact` before the soft threshold. At or above the soft threshold the runtime asks the model whether to compact now or finish a bounded step first. At or above the hard threshold the runtime compacts before another normal model turn. An absolute user threshold wins over a ratio. If model capacity is unknown, automatic ratio triggering is disabled rather than guessed; manual compaction remains available.
+Modes are `auto`, `manual`, and `off`. In `auto`, the model may invoke `context.compact` before the soft threshold. At or above the soft threshold the runtime asks the model whether to compact now or finish a bounded step first. At or above the hard threshold the runtime compacts before another normal model turn. An absolute user threshold wins over a ratio. If model capacity is unknown, automatic ratio triggering is disabled rather than guessed; manual compaction remains available. The active model summarizes by default; optional `compaction.modelId` selects another registered model without changing ledger validation.
 
 ### Lossless sidecar
 
@@ -113,7 +113,7 @@ Git state is collected by the runtime through read-only commands. Scientific ent
 
 ## Minimal TUI
 
-The TUI has a transcript, a bottom composer, and a collapsible run-status panel. It shows the active model, context use and thresholds, current tool/process, compaction status, and budget. It supports run selection, model selection, cancel, and manual compact. It does not include a file tree, editor, diff workbench, dashboard, or web UI.
+The TUI has a transcript, a bottom composer, and compact run status. It shows the active model, autonomy mode, context use, current tool/process, compaction status, and budget. It supports run inspection, model selection, cancel, and manual compact. OpenTUI is the primary renderer; an ANSI renderer preserves the same essential controls when native FFI is unavailable. It does not include a file tree, editor, diff workbench, dashboard, or web UI.
 
 ## Verification
 

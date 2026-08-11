@@ -1,5 +1,6 @@
 export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue =
+  JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
 export type RunEventType =
   | "run.created"
@@ -35,7 +36,14 @@ export interface NewRunEvent<TData extends JsonValue = JsonValue> {
   readonly data: TData;
 }
 
-export type RunStatus = "created" | "running" | "waiting" | "compacting" | "failed" | "cancelled" | "done";
+export type RunStatus =
+  | "created"
+  | "running"
+  | "waiting"
+  | "compacting"
+  | "failed"
+  | "cancelled"
+  | "done";
 
 export interface ModelDescriptor {
   readonly id: string;
@@ -57,4 +65,3 @@ export interface TokenUsage {
   readonly totalTokens?: number;
   readonly estimated: boolean;
 }
-

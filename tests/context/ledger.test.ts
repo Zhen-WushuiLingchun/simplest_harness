@@ -1,6 +1,9 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { PreservationLedger, verifyLedgerSnapshot } from "../../src/context/ledger.js";
+import {
+  PreservationLedger,
+  verifyLedgerSnapshot,
+} from "../../src/context/ledger.js";
 import { numericalEntry } from "./fixtures.js";
 
 describe("PreservationLedger", () => {
@@ -28,13 +31,18 @@ describe("PreservationLedger", () => {
     fc.assert(
       fc.property(fc.string({ minLength: 1 }), (literalValue) => {
         const ledger = new PreservationLedger();
-        ledger.upsert(numericalEntry({
-          value: { ...numericalEntry().value, literalValue },
-        }));
+        ledger.upsert(
+          numericalEntry({
+            value: { ...numericalEntry().value, literalValue },
+          }),
+        );
         const snapshot = ledger.snapshot();
         const corrupted = structuredClone(snapshot);
-        corrupted.sections.validated_numerical_result[0]!.value.literalValue += " changed";
-        expect(() => verifyLedgerSnapshot(corrupted)).toThrow(/digest mismatch/);
+        corrupted.sections.validated_numerical_result[0]!.value.literalValue +=
+          " changed";
+        expect(() => verifyLedgerSnapshot(corrupted)).toThrow(
+          /digest mismatch/,
+        );
       }),
     );
   });
@@ -48,7 +56,11 @@ describe("PreservationLedger", () => {
         category: "correctness_risk",
         sourceEventIds: [],
         updatedAt: "2026-08-11T01:04:03.000Z",
-        value: { risk: "conflict", evidence: "test", impact: "ambiguous state" },
+        value: {
+          risk: "conflict",
+          evidence: "test",
+          impact: "ambiguous state",
+        },
       }),
     ).toThrow(/category is immutable/);
   });

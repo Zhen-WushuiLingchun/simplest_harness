@@ -1,0 +1,30 @@
+{
+  "dataDir": ".tmsh",
+  "host": "127.0.0.1",
+  "port": 4097,
+  "defaultModel": "deepseek.main",
+  "models": [
+    {
+      "id": "deepseek.main",
+      "provider": "openai-compatible",
+      "model": "deepseek-v4-flash",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "baseUrl": "https://api.deepseek.com",
+      "maxInputTokens": 1000000,
+      "maxOutputTokens": 16384,
+      "supportsTools": true,
+      "supportsImages": false,
+      "relativeCost": "low",
+      "capabilities": ["reasoning", "coding", "tool-use", "long-context"]
+    }
+  ],
+  "autonomy": { "mode": "confirm" },
+  "compaction": {
+    "mode": "auto",
+    "modelId": "deepseek.main",
+    "triggerRatio": 0.75,
+    "hardRatio": 0.9,
+    "recentTurns": 4,
+    "allowModelEarly": true
+  }
+}

@@ -39,7 +39,12 @@ export const discrepancyEntrySchema = z
     ...sourceFields,
     category: z.literal("implementation_discrepancy"),
     value: z
-      .object({ approximate: exactText, oracle: exactText, discrepancy: exactText, evidence: exactText })
+      .object({
+        approximate: exactText,
+        oracle: exactText,
+        discrepancy: exactText,
+        evidence: exactText,
+      })
       .strict(),
   })
   .strict();
@@ -49,7 +54,12 @@ export const failedHypothesisEntrySchema = z
     ...sourceFields,
     category: z.literal("failed_hypothesis"),
     value: z
-      .object({ hypothesis: exactText, outcome: exactText, whyFailed: exactText, evidence: exactText })
+      .object({
+        hypothesis: exactText,
+        outcome: exactText,
+        whyFailed: exactText,
+        evidence: exactText,
+      })
       .strict(),
   })
   .strict();
@@ -75,7 +85,9 @@ export const correctnessRiskEntrySchema = z
   .object({
     ...sourceFields,
     category: z.literal("correctness_risk"),
-    value: z.object({ risk: exactText, evidence: exactText, impact: exactText }).strict(),
+    value: z
+      .object({ risk: exactText, evidence: exactText, impact: exactText })
+      .strict(),
   })
   .strict();
 
@@ -84,7 +96,12 @@ export const nextVerificationEntrySchema = z
     ...sourceFields,
     category: z.literal("next_verification"),
     value: z
-      .object({ step: exactText, command: z.string().optional(), expected: exactText, evidenceNeeded: exactText })
+      .object({
+        step: exactText,
+        command: z.string().optional(),
+        expected: exactText,
+        evidenceNeeded: exactText,
+      })
       .strict(),
   })
   .strict();
@@ -138,7 +155,10 @@ export const compactionSourceSchema = z
     eventDigest: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict()
-  .refine((source) => source.throughSeq >= source.fromSeq, "throughSeq must not precede fromSeq");
+  .refine(
+    (source) => source.throughSeq >= source.fromSeq,
+    "throughSeq must not precede fromSeq",
+  );
 
 export const compactionCandidateSchema = z
   .object({

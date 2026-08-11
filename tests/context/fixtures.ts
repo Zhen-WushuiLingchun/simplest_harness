@@ -14,7 +14,9 @@ export const source: CompactionSource = {
   eventDigest: "a".repeat(64),
 };
 
-export function numericalEntry(overrides: Partial<NumericalResultEntry> = {}): NumericalResultEntry {
+export function numericalEntry(
+  overrides: Partial<NumericalResultEntry> = {},
+): NumericalResultEntry {
   return {
     id: "num.speed",
     category: "validated_numerical_result",
@@ -24,7 +26,10 @@ export function numericalEntry(overrides: Partial<NumericalResultEntry> = {}): N
       quantity: "wave speed",
       literalValue: "299792458",
       unit: "m s^-1",
-      parameters: { medium: "vacuum", temperature: "0 K (parameter retained literally)" },
+      parameters: {
+        medium: "vacuum",
+        temperature: "0 K (parameter retained literally)",
+      },
       method: "defined SI constant",
       evidence: "event-7",
     },
