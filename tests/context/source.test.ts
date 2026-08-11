@@ -24,6 +24,17 @@ describe("createCompactionSource", () => {
     expect(first.eventDigest).not.toBe(changed.eventDigest);
   });
 
+  it("binds resumed history to an exact prior-session digest", () => {
+    const source = createCompactionSource("run-1", [event(1)], {
+      sessionId: "00000000-0000-4000-8000-000000000001",
+      stateDigest: "a".repeat(64),
+    });
+    expect(source.priorSession).toEqual({
+      sessionId: "00000000-0000-4000-8000-000000000001",
+      stateDigest: "a".repeat(64),
+    });
+  });
+
   it("rejects empty, cross-run, and non-contiguous ranges", () => {
     expect(() => createCompactionSource("run-1", [])).toThrow(/empty/);
     expect(() => createCompactionSource("run-1", [event(1, "run-2")])).toThrow(

@@ -2,6 +2,7 @@
   "name": "tmsh",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.21.0",
   "description": "The most simplest model-directed AI harness",
   "type": "module",
   "bin": {
@@ -13,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "node dist/cli.js",
+    "tui": "bun dist/cli.js tui",
     "dev": "tsx src/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -33,6 +35,7 @@
     "@ai-sdk/anthropic": "^4.0.36",
     "@ai-sdk/openai": "^4.0.36",
     "@ai-sdk/openai-compatible": "^3.0.28",
+    "@inquirer/prompts": "7.10.1",
     "@modelcontextprotocol/client": "^2.0.0",
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",

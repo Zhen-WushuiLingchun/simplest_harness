@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { ModelMessage, ToolResultPart } from "ai";
 import type { AutonomyMode, TmshConfig } from "../core/config.js";
 import type { EventStore } from "../core/event-store.js";
 import { ToolRegistry } from "../core/tool-registry.js";
 import type { JsonValue, RunStatus } from "../core/types.js";
+import {
+  sessionStateDigest,
+  type SessionStore,
+} from "../core/session-store.js";
 import { ContextCompactor } from "../context/compactor.js";
 import { collectGitState } from "../context/git-state.js";
 import { PreservationLedger } from "../context/ledger.js";
@@ -27,11 +31,13 @@ export interface StartRunInput {
   readonly workspace: string;
   readonly autonomy?: AutonomyMode;
   readonly maxCalls?: number;
+  readonly sessionId?: string;
 }
 
 export interface RunSnapshot {
   readonly runId: string;
   readonly parentRunId?: string;
+  readonly sessionId?: string;
   readonly status: RunStatus;
   readonly goal: string;
   readonly modelId: string;
@@ -48,6 +54,9 @@ export interface RunSnapshot {
 interface RunRecord {
   readonly id: string;
   readonly parentRunId: string | undefined;
+  readonly sessionId: string | undefined;
+  readonly priorSessionSource:
+    { readonly sessionId: string; readonly stateDigest: string } | undefined;
   readonly goal: string;
   readonly modelId: string;
   readonly workspace: string;
@@ -76,6 +85,7 @@ export class RunEngine {
   readonly #approvals = new ApprovalGate();
   readonly #runs = new Map<string, RunRecord>();
   readonly #distributionRoot: string;
+  readonly #sessions: SessionStore | undefined;
   readonly #delegations = new Map<string, number>();
 
   public constructor(
@@ -83,11 +93,13 @@ export class RunEngine {
     events: EventStore,
     models: ModelRegistry,
     distributionRoot: string,
+    sessions?: SessionStore,
   ) {
     this.#config = config;
     this.#events = events;
     this.#models = models;
     this.#distributionRoot = distributionRoot;
+    this.#sessions = sessions;
     registerBuiltinTools(this.#tools, {
       config,
       events,
@@ -112,6 +124,7 @@ export class RunEngine {
       ...(run.parentRunId === undefined
         ? {}
         : { parentRunId: run.parentRunId }),
+      ...(run.sessionId === undefined ? {} : { sessionId: run.sessionId }),
       status: run.status,
       goal: run.goal,
       modelId: run.modelId,
@@ -181,10 +194,27 @@ export class RunEngine {
     if (modelId === undefined)
       throw new Error("no model selected and no defaultModel configured");
     this.#models.get(modelId);
+    if (parentRunId !== undefined && input.sessionId !== undefined)
+      throw new Error("delegated runs cannot attach to a user session");
+    const session =
+      input.sessionId === undefined
+        ? undefined
+        : await this.#requireSessionStore().load(input.sessionId);
+    if (session !== undefined && session.workspace !== resolve(input.workspace))
+      throw new Error(
+        `session workspace differs from the requested workspace: ${session.workspace}`,
+      );
+    const ledger = new PreservationLedger();
+    if (session !== undefined) ledger.load(session.ledger);
     const id = randomUUID();
     const run: RunRecord = {
       id,
       parentRunId,
+      sessionId: session?.id,
+      priorSessionSource:
+        session === undefined
+          ? undefined
+          : { sessionId: session.id, stateDigest: sessionStateDigest(session) },
       goal: input.goal,
       modelId,
       workspace: input.workspace,
@@ -195,8 +225,11 @@ export class RunEngine {
       ),
       depth,
       controller: new AbortController(),
-      ledger: new PreservationLedger(),
-      messages: [{ role: "user", content: input.goal }],
+      ledger,
+      messages: [
+        ...(session?.messages ?? []),
+        { role: "user", content: input.goal },
+      ],
       status: "created",
       modelCalls: 0,
       lastInputTokens: 0,
@@ -210,6 +243,7 @@ export class RunEngine {
       data: toJsonValue({
         runId: id,
         parentRunId: parentRunId ?? null,
+        sessionId: session?.id ?? null,
         goal: input.goal,
         modelId,
         workspace: input.workspace,
@@ -217,6 +251,7 @@ export class RunEngine {
         depth,
       }),
     });
+    await this.#persistSession(run);
     run.execution = this.#execute(run);
     return id;
   }
@@ -252,7 +287,7 @@ export class RunEngine {
         });
         const turn = await adapter.complete({
           system: `${systemBase}${softNotice}`,
-          messages: run.messages,
+          messages: [...run.messages],
           tools: this.#tools.list(),
           signal: run.controller.signal,
           ...(adapter.descriptor.maxOutputTokens === undefined
@@ -286,6 +321,7 @@ export class RunEngine {
             call.input,
             call.providerName,
           );
+        await this.#persistSession(run);
         if (run.compactionRequested) {
           run.compactionRequested = false;
           await this.#compact(run, adapter, systemBase, "model_requested");
@@ -415,7 +451,11 @@ export class RunEngine {
       data: toJsonValue(git),
     });
     const events = await this.#events.replay(run.id);
-    const source = createCompactionSource(run.id, events);
+    const source = createCompactionSource(
+      run.id,
+      events,
+      run.priorSessionSource,
+    );
     const ledger = run.ledger.snapshot();
     const messages = toJsonValue(run.messages) as JsonValue[];
     const summaryAdapter =
@@ -462,6 +502,7 @@ export class RunEngine {
         source: result.artifact.source,
       }),
     });
+    await this.#persistSession(run);
     return true;
   }
 
@@ -564,6 +605,21 @@ export class RunEngine {
     const run = this.#runs.get(id);
     if (run === undefined) throw new Error(`unknown run: ${id}`);
     return run;
+  }
+
+  #requireSessionStore(): SessionStore {
+    if (this.#sessions === undefined)
+      throw new Error("session persistence is not configured");
+    return this.#sessions;
+  }
+
+  async #persistSession(run: RunRecord): Promise<void> {
+    if (run.sessionId === undefined) return;
+    await this.#requireSessionStore().saveState(run.sessionId, {
+      modelId: run.modelId,
+      messages: run.messages,
+      ledger: run.ledger.snapshot(),
+    });
   }
 }
 

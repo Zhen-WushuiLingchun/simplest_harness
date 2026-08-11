@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { stdin, stdout } from "node:process";
 import { TmshApiServer } from "./api/server.js";
 import { resolveConfig, type TmshConfig } from "./core/config.js";
@@ -10,6 +10,9 @@ import type { RunEvent } from "./core/types.js";
 import { createRuntime } from "./runtime/runtime.js";
 import { runTmshTui } from "./tui/app.js";
 import { serveTmshMcpStdio } from "./mcp/server.js";
+import { loadLocalEnvironment } from "./setup/local-env.js";
+import { runApiSetupWizard } from "./setup/wizard.js";
+import { relaunchTuiWithBun } from "./tui/bun-runtime.js";
 
 const distributionRoot = fileURLToPath(new URL("../", import.meta.url));
 
@@ -20,17 +23,28 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     stdout.write(helpText());
     return 0;
   }
+  if (command === "tui") {
+    const relaunched = relaunchTuiWithBun(argv);
+    if (relaunched !== undefined) return relaunched;
+  }
   const flags = parseFlags(args);
   const loaded = await loadConfig(process.cwd(), stringFlag(flags, "config"));
+  const configPath = loaded.source ?? resolve(process.cwd(), "tmsh.local.json");
+  const localEnvironment = await loadLocalEnvironment(dirname(configPath));
   const config = flags.has("yolo")
     ? resolveConfig({ ...loaded.config, autonomy: { mode: "yolo" } })
     : loaded.config;
+
+  if (command === "api") {
+    await runApiSetupWizard(configPath);
+    return 0;
+  }
 
   if (command === "doctor") {
     const runtime = await createRuntime(config, distributionRoot);
     try {
       stdout.write(
-        `${JSON.stringify({ ok: true, node: process.version, config: loaded.source ?? null, dataDir: config.dataDir, autonomy: config.autonomy.mode, models: runtime.models.list(), mcp: runtime.mcp.list() }, null, 2)}\n`,
+        `${JSON.stringify({ ok: true, node: process.version, config: loaded.source ?? null, localEnv: { path: localEnvironment.path, loadedNames: localEnvironment.loaded }, dataDir: config.dataDir, autonomy: config.autonomy.mode, models: runtime.models.list(), mcp: runtime.mcp.list() }, null, 2)}\n`,
       );
       return runtime.models.list().some((model) => model.available) ||
         config.models.length === 0
@@ -119,6 +133,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         workspace,
         modelId,
         goal.length === 0 ? undefined : goal,
+        () => runApiSetupWizard(configPath),
       );
     } finally {
       await runtime.close();
@@ -208,7 +223,7 @@ function waitForSignal(): Promise<void> {
 }
 
 function helpText(): string {
-  return `TMSH - the most simplest model-directed harness\n\nUsage:\n  tmsh run "goal" [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh serve [--yolo] [--config PATH]\n  tmsh mcp [--config PATH]\n  tmsh models [--config PATH]\n  tmsh tools [--config PATH]\n  tmsh doctor [--config PATH]\n\n--yolo explicitly bypasses per-call approval for mutating/external tools; audit and compaction validation remain active.\n`;
+  return `TMSH - the most simplest model-directed harness\n\nUsage:\n  tmsh api [--config PATH]\n  tmsh run "goal" [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh serve [--yolo] [--config PATH]\n  tmsh mcp [--config PATH]\n  tmsh models [--config PATH]\n  tmsh tools [--config PATH]\n  tmsh doctor [--config PATH]\n\nInside the TUI, /api configures providers and /resume restores ignored local sessions.\n--yolo explicitly bypasses per-call approval for mutating/external tools; audit and compaction validation remain active.\n`;
 }
 
 if (

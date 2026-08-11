@@ -10,6 +10,7 @@ __pycache__/
 .env.*
 !.env.example
 tmsh.local.json
+tmsh.local.env
 
 .tmsh/
 .toolsmith/work/

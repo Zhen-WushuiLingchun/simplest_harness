@@ -66,7 +66,9 @@ CLI、TUI、HTTP/SSE 和 MCP Server 只是同一运行核心的不同入口；�
 - 结构化前台/后台命令执行、增量等待、标准输入、超时、停止和输出截断。
 - 有重定向、字节数、超时限制的 HTTP/HTTPS 页面获取；需要原始 `curl` 时可走进程工具。
 - MCP stdio 与 Streamable HTTP 客户端，以及把 TMSH 暴露给外部 Agent 的 stdio MCP Server。
-- CLI、HTTP/SSE API、OpenTUI TUI，以及 OpenTUI 原生 FFI 不可用时的 ANSI TUI 回退。
+- CLI、HTTP/SSE API、由 Bun 驱动的原生 OpenTUI，以及原生 FFI 不可用时的 ANSI TUI 回退。
+- `/api`/`tmsh api` 本地配置向导：隐藏输入密钥、认证后枚举模型、多选并热接入当前 TUI。
+- `.tmsh/sessions/` 本地长期会话与 `/resume` 恢复，完整继承模型消息和精确 ledger。
 - RE-TRAC 风格叙述压缩 + SHA-256 校验的无损精确账本。
 - 显式 `--yolo` 自主模式，同时保留审计、资源限制、凭据边界和压缩完整性校验。
 - 休眠、固定来源版本的 `adaptive-toolsmith` 基础插件。
@@ -75,6 +77,7 @@ CLI、TUI、HTTP/SSE 和 MCP Server 只是同一运行核心的不同入口；�
 
 - Node.js `22` 或更高版本
 - pnpm
+- [Bun](https://bun.sh/docs/installation)（推荐；用于原生 OpenTUI。没有 Bun 时其他命令和 ANSI TUI 仍可运行）
 - 至少一个已配置且可用的模型 API；只查看帮助、运行测试或使用 fake adapter 时不需要真实密钥
 
 检查本机版本：
@@ -94,9 +97,9 @@ Set-Location simplest_harness
 
 pnpm install
 pnpm build
-Copy-Item tmsh.example.json tmsh.local.json
+npm install -g bun
 
-$env:DEEPSEEK_API_KEY = "你的 API Key"
+pnpm start api
 pnpm start doctor --config tmsh.local.json
 pnpm start tui --config tmsh.local.json --yolo
 ```
@@ -109,14 +112,16 @@ cd simplest_harness
 
 pnpm install
 pnpm build
-cp tmsh.example.json tmsh.local.json
+curl -fsSL https://bun.com/install | bash
 
-export DEEPSEEK_API_KEY="你的 API Key"
+pnpm start api
 pnpm start doctor --config tmsh.local.json
 pnpm start tui --config tmsh.local.json --yolo
 ```
 
-`tmsh.local.json`、`.env*`、运行事件、压缩产物和 toolsmith 工作目录均已加入 `.gitignore`。配置文件只保存**环境变量名**，不要把真实密钥写入 JSON、Prompt、事件或 Git。
+`tmsh api` 会让用户先选择提供商，再隐藏输入 API Key，向该提供商的模型枚举端点认证，并让用户多选一个或多个模型。模型描述写入 `tmsh.local.json`，Key 写入 `tmsh.local.env`。两者以及 `.tmsh/` 运行数据均已加入 `.gitignore`。
+
+`tmsh.local.env` 是用户明确选择的本地明文便利方案：TMSH 会尽量收紧文件权限，但 Windows 的 `chmod` 不等价于 POSIX `0600`。真实密钥不会进入模型描述、事件、Prompt、fixture 或 Git；仍需保护本机用户账户和工作目录。
 
 如果已经把本项目安装为全局或可执行包，可直接把 `pnpm start` 换成 `tmsh`。在源码仓库内开发时，也可以使用 `pnpm dev` 直接运行 TypeScript 入口。
 
@@ -134,6 +139,12 @@ pnpm start run "先调研当前项目，再检查测试并报告证据" --config
 pnpm start tui --config tmsh.local.json --yolo
 ```
 
+在真实交互终端中，`tmsh tui` 如果发现 Bun，会自动用 Bun 重启自身并进入原生 OpenTUI；这与 OpenCode 当前使用 OpenTUI 的运行路线一致。源码仓库也提供显式命令：
+
+```powershell
+pnpm tui -- --config tmsh.local.json --yolo
+```
+
 只查看配置、模型和工具是否就绪：
 
 ```powershell
@@ -145,6 +156,7 @@ pnpm start tools --config tmsh.local.json
 ## CLI 命令
 
 ```text
+tmsh api [--config PATH]
 tmsh run "goal" [--model ID] [--workspace PATH] [--yolo] [--config PATH]
 tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]
 tmsh serve [--yolo] [--config PATH]
@@ -154,15 +166,16 @@ tmsh tools [--config PATH]
 tmsh doctor [--config PATH]
 ```
 
-| 命令     | 用途                                                     |
-| -------- | -------------------------------------------------------- |
-| `run`    | 启动一个任务，输出运行事件和最终结果                     |
-| `tui`    | 启动交互式终端界面，可连续提交任务                       |
-| `serve`  | 启动 loopback HTTP/SSE API，默认 `127.0.0.1:4097`        |
-| `mcp`    | 通过 stdio 启动 TMSH MCP Server                          |
-| `models` | 列出模型描述、能力、上下文容量和当前可用性               |
-| `tools`  | 列出当前模型可见的内置与 MCP 工具                        |
-| `doctor` | 检查 Node、配置来源、数据目录、自主模式、模型与 MCP 状态 |
+| 命令     | 用途                                                                |
+| -------- | ------------------------------------------------------------------- |
+| `api`    | 隐藏输入 Key、枚举模型并更新本地忽略配置                            |
+| `run`    | 启动一个任务，输出运行事件和最终结果                                |
+| `tui`    | 启动交互式终端界面，可连续提交并恢复长期会话                        |
+| `serve`  | 启动 loopback HTTP/SSE API，默认 `127.0.0.1:4097`                   |
+| `mcp`    | 通过 stdio 启动 TMSH MCP Server                                     |
+| `models` | 列出模型描述、能力、上下文容量和当前可用性                          |
+| `tools`  | 列出当前模型可见的内置与 MCP 工具                                   |
+| `doctor` | 检查 Node、配置、本地 env 名称、数据目录、自主模式、模型与 MCP 状态 |
 
 常用参数：
 
@@ -173,20 +186,36 @@ tmsh doctor [--config PATH]
 
 ## TUI
 
-TUI 优先使用 [`@opentui/core`](https://github.com/anomalyco/opentui)。当前实现若检测到运行时缺少可用的原生 FFI，会自动降级到功能可用的 ANSI TUI，而不是阻止任务运行。
+TUI 使用 [`@opentui/core`](https://github.com/anomalyco/opentui)，与 OpenCode 的 TUI 技术路线同源。OpenTUI 的 renderer 需要原生 FFI：TMSH 在交互终端中优先自动寻找 Bun 并重启 TUI；Node 路线未来可在 Node `26.4+` 配合实验性 FFI 使用。若原生 renderer 仍不可用，TMSH 会明确报告原因并自动进入功能可用的 ANSI 回退，而不是阻止任务运行。
 
 支持的交互命令：
 
-| 命令        | 说明                                       |
-| ----------- | ------------------------------------------ |
-| `/model ID` | 为后续任务切换模型                         |
-| `/models`   | 查看已注册模型及可用性                     |
-| `/compact`  | 请求当前运行在下一个模型边界进行校验式压缩 |
-| `/cancel`   | 取消当前运行                               |
-| `/runs`     | 查看本进程中的运行列表                     |
-| `/quit`     | 退出 TUI                                   |
+| 命令         | 说明                                                       |
+| ------------ | ---------------------------------------------------------- |
+| `/api`       | 暂停 renderer，进入隐藏密钥的 API/模型配置向导，再返回 TUI |
+| `/model ID`  | 为后续任务切换模型                                         |
+| `/models`    | 查看已注册模型及可用性                                     |
+| `/resume`    | 列出当前 workspace 的本地会话                              |
+| `/resume ID` | 通过完整 UUID 或唯一前缀恢复会话                           |
+| `/new`       | 让下一条目标创建新会话                                     |
+| `/compact`   | 请求当前运行在下一个模型边界进行校验式压缩                 |
+| `/cancel`    | 取消当前运行                                               |
+| `/runs`      | 查看本进程中的运行列表                                     |
+| `/quit`      | 退出 TUI                                                   |
 
-界面会持续显示 `CONFIRM` 或 `YOLO`，不会把高自主模式隐藏在配置深处。精确账本和完整事件保存在磁盘，不会为了终端显示长度而被丢弃。
+界面会持续显示 `CONFIRM` 或 `YOLO`、当前模型和 session 前缀，不会把高自主模式或会话身份隐藏起来。精确账本和完整事件保存在磁盘，不会为了终端显示长度而被丢弃。
+
+### `/api` 的识别边界
+
+当前向导支持 DeepSeek、OpenAI、Anthropic 和用户指定的 OpenAI-compatible Base URL。它不会把一把 Key 发送给多个厂商“猜提供商”，因为这会泄露凭据；用户先选定服务边界，TMSH 再用该 Key 调用对应的模型列表端点，这里的“自动识别模型”指**认证后枚举账户实际可见的模型 ID**。
+
+提供商的模型列表通常不包含可靠的上下文长度、价格、视觉能力和工具调用能力元数据。向导不会编造这些数值：自动生成的描述会标记 `discovered` 和 `tool-use-unverified`，未知上下文容量将使比例式自动压缩保持关闭，用户可依据官方规格继续编辑 `tmsh.local.json`。
+
+### `/resume` 的持久化语义
+
+TUI 的第一条目标自动创建 session。每个完成的模型/工具边界和成功压缩都会原子更新 `.tmsh/sessions/<uuid>.json`，其中包含完整 `ModelMessage[]`、模型 ID、workspace 和经过 digest 校验的 preservation ledger。恢复时不是只显示旧聊天文本，而是把历史消息与 ledger 重新交给 Run Engine。
+
+恢复会话后的压缩源同时绑定本次 run 事件 digest 和恢复前 session state digest，避免把跨进程历史错误归因成当前单次 run。session 是连续性状态；`.tmsh/runs/<runId>/events.jsonl` 和 compaction artifact 仍是工具调用、负面结果与压缩边界的审计证据。
 
 ## 配置文件
 
@@ -257,9 +286,13 @@ TUI 优先使用 [`@opentui/core`](https://github.com/anomalyco/opentui)。当�
 
 配置会进行失败关闭式校验：模型 ID 不可重复，默认模型和压缩模型必须已注册，MCP ID 必须合法且唯一，比例与资源上限必须有效，非 loopback API 地址会被拒绝。
 
+启动时，TMSH 会在配置文件同目录读取 `tmsh.local.env`。该文件使用 TMSH 自己写出的严格 `NAME="JSON string"` 格式，外部环境变量优先于同名本地值；格式错误、重复变量或非字符串值都会失败关闭。`doctor` 只显示加载的变量名，不显示变量值。
+
 ## 注册多个模型
 
 模型描述不是路由规则，而是给模型自己决策时使用的**可见能力表**。用户可以同时注册多个提供商：
+
+最方便的路径是重复运行 `tmsh api`，为不同账户填写不同的连接名称并多选模型。向导会生成不同的 `TMSH_<CONNECTION>_API_KEY` 环境变量引用；同一个 TUI 内通过 `/api` 新增的模型会立即热注册，无需重启。下面的手写配置仍然受支持，适合补充官方上下文容量和能力元数据：
 
 ```json
 {
@@ -585,6 +618,8 @@ hard   = floor(usable * hardRatio)                      # 默认 0.90
 
 ```text
 .tmsh/
+├── sessions/
+│   └── <sessionId>.json
 └── runs/
     └── <runId>/
         ├── events.jsonl
@@ -602,7 +637,7 @@ hard   = floor(usable * hardRatio)                      # 默认 0.90
 
 事件先落盘再向客户端报告，以减少“界面显示成功但证据没有保存”的状态差异。运行状态包括 `created`、`running`、`waiting`、`compacting`、`failed`、`cancelled` 和 `done`。
 
-`.tmsh` 默认不提交到 Git；如需长期审计，应由项目自行决定备份、脱敏和保留策略。
+`.tmsh` 默认不提交到 Git；其中的 session 可能含有完整对话和工具上下文。如需长期审计或同步，应由项目自行决定备份、脱敏、加密和保留策略。
 
 ## 项目目录
 
@@ -614,12 +649,13 @@ hard   = floor(usable * hardRatio)                      # 默认 0.90
 ├── src/
 │   ├── api/                      # loopback HTTP/SSE API
 │   ├── context/                  # 阈值、RE-TRAC、精确账本与 Git 状态
-│   ├── core/                     # 配置、事件与工具注册表
+│   ├── core/                     # 配置、事件、session 与工具注册表
 │   ├── mcp/                      # MCP Client 与 MCP Server
 │   ├── models/                   # 模型适配器与模型注册表
 │   ├── runtime/                  # Run Engine、审批与内置工具
+│   ├── setup/                    # 本地 env、API 发现与配置向导
 │   ├── tools/                    # 进程与 HTTP 原子能力
-│   ├── tui/                      # OpenTUI 与 ANSI 回退
+│   ├── tui/                      # OpenTUI、Bun 启动与 ANSI 回退
 │   └── cli.ts                    # 命令行入口
 ├── tests/                        # Vitest 测试
 ├── docs/
@@ -641,23 +677,24 @@ pnpm format:check
 git diff --check
 ```
 
-当前仓库的确定性测试不使用真实 API Key，也不会产生付费模型调用。测试覆盖配置、事件、工具审批、进程、HTTP、MCP、上下文阈值与精确压缩、API/SSE、TUI 回退和运行核心等关键路径。
+当前仓库的确定性测试不使用真实 API Key，也不会产生付费模型调用。测试覆盖配置、事件、session 恢复、精确 ledger 继承、API 模型发现、密钥/描述分离、工具审批、进程、HTTP、MCP、上下文阈值与精确压缩、API/SSE、Bun 选择、TUI 回退和运行核心等关键路径。
 
 本版本交付前已观察到：
 
-- 17 个测试文件、43 个测试通过；
+- 20 个测试文件、53 个测试通过；
 - TypeScript 类型检查、构建和格式检查通过；
 - DeepSeek 真实模型完成基础回复、工具调用和压缩 smoke；
 - loopback API 健康检查、模型/工具枚举和 SSE 路径通过 smoke；
 - stdio MCP Server 可枚举 7 个控制工具；
-- 当前 Windows/Node 组合下 OpenTUI 原生 FFI 不可用，但 ANSI 回退已实际运行验证；
+- 本机 Bun `1.3.14` 成功初始化 OpenTUI 原生 alternate-screen renderer；Node `v24.8.0` 缺少 `node:ffi` 时 ANSI 回退也通过 smoke；
 - adaptive-toolsmith 的普通与 Python `-O` 自检通过。
 
 这些是该提交形成前的观察结果，不代表任何未来环境、第三方 API 或新模型版本会自动保持兼容；修改实现后应重新运行相应测试和真实 smoke。
 
 ## 安全边界
 
-- **密钥**：配置只引用环境变量名；不要把值写入配置、事件、Prompt、fixture 或 Git。
+- **密钥**：模型配置只引用环境变量名；`tmsh.local.env` 是被忽略的本地明文秘密文件，值不会进入事件、Prompt、fixture 或 Git。
+- **会话**：`.tmsh/sessions` 含完整本地对话，默认被忽略但未加密。
 - **网络**：API 仅允许 loopback；HTTP/MCP 返回内容仍是不受信任输入。
 - **命令**：结构化 argv 是默认路径，shell 必须显式开启。
 - **资源**：进程、网络响应、模型轮次、委派深度和并发都有上限。
@@ -669,7 +706,9 @@ git diff --check
 
 - 没有远程 API 认证，HTTP 服务因此只支持 loopback。
 - 没有 Web UI；TUI 保持最小功能面。
-- OpenTUI 的原生能力取决于 Node、平台和本地 FFI 兼容性；不可用时走 ANSI 回退。
+- OpenTUI 原生界面依赖 Bun，或支持实验性 FFI 的新 Node 版本；找不到兼容运行时时走 ANSI 回退。
+- `tmsh.local.env` 与 session 是本地明文便利存储，不替代操作系统凭据库或磁盘加密。
+- 模型枚举 API 通常只返回 ID；自动接入无法可靠推断上下文容量、价格、视觉和工具能力。
 - 模型能力、成本等级和上下文容量来自用户配置，TMSH 不在线维护提供商目录。
 - `supportsImages` 可以描述模型能力，但 v0.1 的核心任务输入仍以文本与工具反馈为主。
 - workspace 不是文件系统隔离边界。
@@ -684,6 +723,8 @@ git diff --check
 - [Anthropic Compaction](https://platform.claude.com/docs/en/build-with-claude/compaction)：长上下文压缩与保留策略参考。
 - [Model Context Protocol TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)：MCP Client/Server 实现基础。
 - [OpenTUI](https://github.com/anomalyco/opentui)：终端界面设计与运行库。
+- [OpenTUI Getting Started](https://opentui.com/docs/getting-started/)：Bun 和 Node 原生 FFI 运行要求。
+- [Bun Installation](https://bun.sh/docs/installation)：跨平台 Bun 安装与验证。
 - [OpenCode Server](https://dev.opencode.ai/docs/server/)：Agent Harness API/TUI 分层的参考实现之一。
 - [Harness-Native Model Routing](https://arxiv.org/abs/2607.11399)：模型能力暴露与 Harness 内路由问题的相关研究；TMSH 当前选择模型自决策 + 有界委派，而不是学习式路由器。
 

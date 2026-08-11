@@ -44,4 +44,26 @@ describe("ModelRegistry", () => {
     expect(state.reason).toContain("TMSH_TEST_MISSING_KEY");
     expect(JSON.stringify(state)).not.toContain("sk-");
   });
+
+  it("hot-registers a model added by the local API wizard", () => {
+    process.env.TMSH_HOT_KEY = "test-only";
+    try {
+      const registry = new ModelRegistry([]);
+      registry.upsert({
+        id: "hot.model",
+        provider: "openai-compatible",
+        model: "hot-model",
+        apiKeyEnv: "TMSH_HOT_KEY",
+        baseUrl: "https://example.invalid/v1",
+        supportsTools: true,
+        supportsImages: false,
+        capabilities: ["discovered"],
+      });
+      expect(registry.list()).toMatchObject([
+        { descriptor: { id: "hot.model" }, available: true },
+      ]);
+    } finally {
+      delete process.env.TMSH_HOT_KEY;
+    }
+  });
 });

@@ -153,6 +153,13 @@ export const compactionSourceSchema = z
     fromSeq: z.number().int().positive(),
     throughSeq: z.number().int().positive(),
     eventDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    priorSession: z
+      .object({
+        sessionId: z.string().uuid(),
+        stateDigest: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .refine(

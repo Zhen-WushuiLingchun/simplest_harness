@@ -6,6 +6,7 @@ import type { CompactionSource } from "./schema.js";
 export function createCompactionSource(
   runId: string,
   events: readonly RunEvent[],
+  priorSession?: CompactionSource["priorSession"],
 ): CompactionSource {
   if (events.length === 0)
     throw new Error("cannot compact an empty event range");
@@ -21,5 +22,6 @@ export function createCompactionSource(
     fromSeq: events[0]!.seq,
     throughSeq: events.at(-1)!.seq,
     eventDigest: sha256Json(events as unknown as JsonValue),
+    ...(priorSession === undefined ? {} : { priorSession }),
   };
 }

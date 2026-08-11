@@ -12,3 +12,15 @@ MIT License. Its upstream license text is retained at
 The optional primary TUI renderer uses `@opentui/core`, licensed under the MIT
 License. When its native FFI backend is unavailable, TMSH uses its built-in ANSI
 fallback instead.
+
+## Inquirer
+
+The local API onboarding wizard uses `@inquirer/prompts`, licensed under the
+MIT License, for masked secret input, provider selection, and model
+multi-selection.
+
+## Bun
+
+Bun is an optional external runtime used to initialize OpenTUI's native
+renderer. It is not vendored into this repository. Bun is distributed under
+the MIT License; see <https://github.com/oven-sh/bun>.

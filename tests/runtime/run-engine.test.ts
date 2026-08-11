@@ -5,6 +5,7 @@ import type { ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
 import { resolveConfig } from "../../src/core/config.js";
 import { EventStore } from "../../src/core/event-store.js";
+import { SessionStore } from "../../src/core/session-store.js";
 import type { JsonValue, ModelDescriptor } from "../../src/core/types.js";
 import {
   FakeModelAdapter,
@@ -220,6 +221,56 @@ describe("RunEngine", () => {
       task: "independent review",
     });
     expect(engine.list()).toHaveLength(2);
+  });
+
+  it("continues a durable session with prior messages intact", async () => {
+    const model = new FakeModelAdapter(descriptor("main"), [
+      finalTurn("first answer"),
+      finalTurn("second answer"),
+    ]);
+    const root = await mkdtemp(join(tmpdir(), "tmsh-engine-session-"));
+    const config = resolveConfig({
+      dataDir: join(root, ".tmsh"),
+      models: [model.descriptor],
+      defaultModel: model.descriptor.id,
+      autonomy: { mode: "yolo" },
+    });
+    const sessions = new SessionStore(config.dataDir);
+    const session = await sessions.create({
+      title: "two turns",
+      workspace: root,
+      modelId: "main",
+    });
+    const engine = new RunEngine(
+      config,
+      new EventStore(config.dataDir),
+      new ModelRegistry([model.descriptor], [model]),
+      distributionRoot,
+      sessions,
+    );
+    const first = await engine.start({
+      goal: "first question",
+      workspace: root,
+      sessionId: session.id,
+    });
+    await engine.wait(first);
+    const second = await engine.start({
+      goal: "second question",
+      workspace: root,
+      sessionId: session.id,
+    });
+    await engine.wait(second);
+
+    expect(model.inputs[1]!.messages).toEqual([
+      { role: "user", content: "first question" },
+      { role: "assistant", content: "first answer" },
+      { role: "user", content: "second question" },
+    ]);
+    const persisted = await sessions.load(session.id);
+    expect(persisted.messages.at(-1)).toEqual({
+      role: "assistant",
+      content: "second answer",
+    });
   });
 });
 

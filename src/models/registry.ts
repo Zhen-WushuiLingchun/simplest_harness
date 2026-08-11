@@ -16,9 +16,7 @@ export class ModelRegistry {
     adapters: readonly ModelAdapter[] = [],
   ) {
     for (const descriptor of descriptors) {
-      if (this.#descriptors.has(descriptor.id))
-        throw new Error(`duplicate model id: ${descriptor.id}`);
-      this.#descriptors.set(descriptor.id, descriptor);
+      this.register(descriptor);
     }
     for (const adapter of adapters) {
       const descriptor = this.#descriptors.get(adapter.descriptor.id);
@@ -28,6 +26,20 @@ export class ModelRegistry {
         );
       this.#adapters.set(adapter.descriptor.id, adapter);
     }
+  }
+
+  public register(descriptor: ModelDescriptor): void {
+    const previous = this.#descriptors.get(descriptor.id);
+    if (previous !== undefined) {
+      if (JSON.stringify(previous) === JSON.stringify(descriptor)) return;
+      throw new Error(`duplicate model id: ${descriptor.id}`);
+    }
+    this.#descriptors.set(descriptor.id, descriptor);
+  }
+
+  public upsert(descriptor: ModelDescriptor): void {
+    this.#descriptors.set(descriptor.id, descriptor);
+    this.#adapters.delete(descriptor.id);
   }
 
   public list(): ModelAvailability[] {

@@ -11,13 +11,16 @@ import { createInterface as createLineInterface } from "node:readline";
 import { stdin, stdout } from "node:process";
 import type { TmshConfig } from "../core/config.js";
 import type { EventStore } from "../core/event-store.js";
+import { sessionTranscript, type SessionStore } from "../core/session-store.js";
 import type { JsonValue, RunEvent } from "../core/types.js";
 import type { ModelRegistry } from "../models/registry.js";
 import type { RunEngine } from "../runtime/run-engine.js";
+import type { ApiSetupResult } from "../setup/api-setup.js";
 
 export interface TuiServices {
   readonly config: TmshConfig;
   readonly events: EventStore;
+  readonly sessions: SessionStore;
   readonly models: ModelRegistry;
   readonly engine: RunEngine;
 }
@@ -26,7 +29,19 @@ export interface TmshTuiView {
   readonly submit: (value: string) => Promise<void>;
   readonly currentRunId: () => string | undefined;
   readonly transcriptText: () => string;
+  readonly selectedModelId: () => string | undefined;
+  readonly selectedSessionId: () => string | undefined;
   destroy(): void;
+}
+
+interface TuiHooks {
+  readonly requestApiSetup?: () => void;
+}
+
+interface TuiExitState {
+  readonly action: "quit" | "api";
+  readonly modelId?: string;
+  readonly sessionId?: string;
 }
 
 export function createTmshTui(
@@ -34,12 +49,15 @@ export function createTmshTui(
   services: TuiServices,
   workspace: string,
   initialModel?: string,
+  initialSessionId?: string,
+  hooks: TuiHooks = {},
 ): TmshTuiView {
   let selectedModel =
     initialModel ??
     services.config.defaultModel ??
     services.models.list().find((item) => item.available)?.descriptor.id;
   let currentRunId: string | undefined;
+  let selectedSessionId = initialSessionId;
   let pendingApproval: { runId: string; callId: string } | undefined;
   let transcript = "TMSH ready. Type a goal, /help, or /quit.\n";
   let unsubscribe: (() => void) | undefined;
@@ -162,12 +180,21 @@ export function createTmshTui(
       );
       return;
     }
+    if (selectedSessionId === undefined) {
+      const session = await services.sessions.create({
+        title: value,
+        workspace,
+        modelId: selectedModel,
+      });
+      selectedSessionId = session.id;
+    }
     append(`\n[user] ${value}\n`);
     const runId = await services.engine.start({
       goal: value,
       modelId: selectedModel,
       workspace,
       autonomy: services.config.autonomy.mode,
+      sessionId: selectedSessionId,
     });
     currentRunId = runId;
     unsubscribe?.();
@@ -182,8 +209,18 @@ export function createTmshTui(
       renderer.destroy();
     } else if (name === "/help") {
       append(
-        "Commands: /model ID, /models, /compact, /cancel, /runs, /quit.\n",
+        "Commands: /api, /model ID, /models, /resume [ID], /new, /compact, /cancel, /runs, /quit.\n",
       );
+    } else if (name === "/api") {
+      if (hasActiveRun())
+        append("[status] Finish or cancel the active run before /api.\n");
+      else if (hooks.requestApiSetup === undefined)
+        append("[error] API setup is unavailable in this TUI host.\n");
+      else {
+        append("[api] Leaving the renderer for masked API setup…\n");
+        hooks.requestApiSetup();
+        renderer.destroy();
+      }
     } else if (name === "/models") {
       append(
         `${services.models
@@ -206,6 +243,44 @@ export function createTmshTui(
       } else {
         selectedModel = id;
         append(`[model] selected ${id}\n`);
+      }
+    } else if (name === "/resume") {
+      if (hasActiveRun()) {
+        append("[status] Finish or cancel the active run before /resume.\n");
+      } else if (rest[0] === undefined) {
+        const sessions = await services.sessions.list(workspace);
+        append(
+          sessions.length === 0
+            ? "[session] No saved sessions for this workspace.\n"
+            : `${sessions
+                .map(
+                  (item) =>
+                    `${item.id.slice(0, 8)} ${item.updatedAt} ${item.modelId} ${item.title}`,
+                )
+                .join("\n")}\nUse /resume <id-or-prefix>.\n`,
+        );
+      } else {
+        const session = await services.sessions.resolve(rest[0], workspace);
+        selectedSessionId = session.id;
+        selectedModel = session.modelId;
+        currentRunId = undefined;
+        unsubscribe?.();
+        unsubscribe = undefined;
+        replaceTranscript(
+          `[session ${session.id.slice(0, 8)}] ${session.title}\n${sessionTranscript(session)}\n[session] resumed; enter the next goal.\n`,
+        );
+      }
+    } else if (name === "/new") {
+      if (hasActiveRun())
+        append("[status] Finish or cancel the active run before /new.\n");
+      else {
+        selectedSessionId = undefined;
+        currentRunId = undefined;
+        unsubscribe?.();
+        unsubscribe = undefined;
+        replaceTranscript(
+          "[session] New conversation selected; the next goal creates it.\n",
+        );
       }
     } else if (name === "/compact") {
       if (currentRunId === undefined) append("[status] No active run.\n");
@@ -288,16 +363,29 @@ export function createTmshTui(
     renderer.requestRender();
   }
 
+  function replaceTranscript(text: string): void {
+    transcript = text;
+    transcriptView.content = transcript;
+    renderer.requestRender();
+  }
+
+  function hasActiveRun(): boolean {
+    return (
+      currentRunId !== undefined &&
+      !terminal(services.engine.snapshot(currentRunId).status)
+    );
+  }
+
   function refreshStatus(): void {
     const run =
       currentRunId === undefined
         ? undefined
         : services.engine.snapshot(currentRunId);
     const mode = services.config.autonomy.mode === "yolo" ? "YOLO" : "CONFIRM";
-    header.content = ` TMSH  ${mode}  model=${selectedModel ?? "none"}  workspace=${workspace}`;
+    header.content = ` TMSH  ${mode}  model=${selectedModel ?? "none"}  session=${selectedSessionId?.slice(0, 8) ?? "new"}  workspace=${workspace}`;
     status.content =
       run === undefined
-        ? ` idle | models=${services.models.list().filter((item) => item.available).length}/${services.models.list().length}\n Ctrl-C exits; durable evidence lives in ${services.config.dataDir}`
+        ? ` idle | models=${services.models.list().filter((item) => item.available).length}/${services.models.list().length}\n /api /resume /new; durable evidence lives in ${services.config.dataDir}`
         : ` ${run.status} | run=${run.runId.slice(0, 8)} | calls=${run.modelCalls} | input=${run.lastInputTokens} tokens | pending=${run.pendingApprovals.length}\n /compact /cancel /runs; exact ledger and event log remain outside the display buffer`;
     renderer.requestRender();
   }
@@ -306,6 +394,8 @@ export function createTmshTui(
     submit,
     currentRunId: () => currentRunId,
     transcriptText: () => transcript,
+    selectedModelId: () => selectedModel,
+    selectedSessionId: () => selectedSessionId,
     destroy: () => {
       unsubscribe?.();
       renderer.destroy();
@@ -318,42 +408,100 @@ export async function runTmshTui(
   workspace: string,
   initialModel?: string,
   initialGoal?: string,
+  apiSetup?: () => Promise<ApiSetupResult>,
 ): Promise<void> {
-  let renderer: CliRenderer;
-  try {
-    renderer = await createCliRenderer({
-      exitOnCtrlC: false,
-      clearOnShutdown: true,
-      useMouse: true,
-      screenMode: "alternate-screen",
-      backgroundColor: "#111318",
-    });
-  } catch (error) {
-    process.stderr.write(
-      `[TMSH] OpenTUI unavailable; using ANSI fallback: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
-    await runAnsiTui(services, workspace, initialModel, initialGoal);
-    return;
+  let modelId = initialModel;
+  let sessionId: string | undefined;
+  let goal = initialGoal;
+  let ansiOnly = false;
+  for (;;) {
+    let state: TuiExitState;
+    if (ansiOnly) {
+      state = await runAnsiTui(
+        services,
+        workspace,
+        modelId,
+        sessionId,
+        goal,
+        apiSetup !== undefined,
+      );
+    } else {
+      let renderer: CliRenderer;
+      try {
+        renderer = await createCliRenderer({
+          exitOnCtrlC: false,
+          clearOnShutdown: true,
+          useMouse: true,
+          screenMode: "alternate-screen",
+          backgroundColor: "#111318",
+        });
+      } catch (error) {
+        process.stderr.write(
+          `[TMSH] OpenTUI unavailable; using ANSI fallback: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+        ansiOnly = true;
+        continue;
+      }
+      let action: "quit" | "api" = "quit";
+      const view = createTmshTui(
+        renderer,
+        services,
+        workspace,
+        modelId,
+        sessionId,
+        {
+          ...(apiSetup === undefined
+            ? {}
+            : { requestApiSetup: () => (action = "api") }),
+        },
+      );
+      if (goal !== undefined && goal.trim().length > 0) await view.submit(goal);
+      await new Promise<void>((resolve) =>
+        renderer.once(CliRenderEvents.DESTROY, () => resolve()),
+      );
+      const selectedModel = view.selectedModelId();
+      const selectedSession = view.selectedSessionId();
+      state = {
+        action,
+        ...(selectedModel === undefined ? {} : { modelId: selectedModel }),
+        ...(selectedSession === undefined
+          ? {}
+          : { sessionId: selectedSession }),
+      };
+    }
+    modelId = state.modelId;
+    sessionId = state.sessionId;
+    goal = undefined;
+    if (state.action === "quit") return;
+    if (apiSetup === undefined) continue;
+    try {
+      const result = await apiSetup();
+      for (const descriptor of result.descriptors)
+        services.models.upsert(descriptor);
+      modelId = result.descriptors[0]?.id ?? modelId;
+    } catch (error) {
+      process.stderr.write(
+        `[TMSH] API setup did not complete: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
   }
-  const view = createTmshTui(renderer, services, workspace, initialModel);
-  if (initialGoal !== undefined && initialGoal.trim().length > 0)
-    await view.submit(initialGoal);
-  await new Promise<void>((resolve) =>
-    renderer.once(CliRenderEvents.DESTROY, () => resolve()),
-  );
 }
 
 export async function runAnsiTui(
   services: TuiServices,
   workspace: string,
   initialModel?: string,
+  initialSessionId?: string,
   initialGoal?: string,
-): Promise<void> {
+  apiSetupAvailable = false,
+): Promise<TuiExitState> {
   let modelId =
     initialModel ??
     services.config.defaultModel ??
     services.models.list().find((item) => item.available)?.descriptor.id;
   let runId: string | undefined;
+  let sessionId = initialSessionId;
+  let action: "quit" | "api" = "quit";
   let pending: { runId: string; callId: string } | undefined;
   let status = "idle";
   let transcript = "TMSH ready. Type a goal, /help, or /quit.";
@@ -377,6 +525,7 @@ export async function runAnsiTui(
       formatAnsiFrame({
         mode: services.config.autonomy.mode,
         ...(modelId === undefined ? {} : { modelId }),
+        ...(sessionId === undefined ? {} : { sessionId }),
         workspace,
         status,
         transcript,
@@ -440,12 +589,21 @@ export async function runAnsiTui(
       append("[status] A run is active. Use /cancel or /compact.");
       return;
     }
+    if (sessionId === undefined) {
+      const session = await services.sessions.create({
+        title: goal,
+        workspace,
+        modelId,
+      });
+      sessionId = session.id;
+    }
     append(`[user] ${goal}`);
     runId = await services.engine.start({
       goal,
       modelId,
       workspace,
       autonomy: services.config.autonomy.mode,
+      sessionId,
     });
     status = services.engine.snapshot(runId).status;
     unsubscribe?.();
@@ -453,78 +611,145 @@ export async function runAnsiTui(
     for (const event of await services.events.replay(runId)) onEvent(event);
   };
 
+  let inputQueue = Promise.resolve();
   rl.on("line", (raw) => {
-    void (async () => {
-      const value = raw.trim();
-      if (pending !== undefined) {
-        services.engine.approve(
-          pending.runId,
-          pending.callId,
-          /^y(es)?$/iu.test(value),
-        );
-        pending = undefined;
-      } else if (value === "/quit") {
-        rl.close();
-        return;
-      } else if (value === "/help")
-        append(
-          "Commands: /model ID, /models, /compact, /cancel, /runs, /quit.",
-        );
-      else if (value === "/models")
-        append(
-          services.models
-            .list()
-            .map(
-              (item) =>
-                `${item.descriptor.id}:${item.available ? "ready" : item.reason}`,
-            )
-            .join("\n"),
-        );
-      else if (value.startsWith("/model ")) {
-        const requested = value.slice(7).trim();
-        if (
-          services.models
-            .list()
-            .some((item) => item.descriptor.id === requested && item.available)
-        )
-          modelId = requested;
-        else append(`[error] Model is unavailable: ${requested}`);
-      } else if (value === "/compact" && runId !== undefined)
-        services.engine.requestCompaction(runId);
-      else if (value === "/cancel" && runId !== undefined)
-        services.engine.cancel(runId);
-      else if (value === "/runs")
-        append(
-          services.engine
-            .list()
-            .map(
-              (run) => `${run.runId.slice(0, 8)} ${run.status} ${run.modelId}`,
-            )
-            .join("\n"),
-        );
-      else if (value.startsWith("/"))
-        append(`[error] Unknown command: ${value}`);
-      else if (value.length > 0) await startGoal(value);
-      render();
-    })().catch((error) => {
-      if (!closed)
-        append(
-          `[error] ${error instanceof Error ? error.message : String(error)}`,
-        );
-    });
+    inputQueue = inputQueue
+      .then(async () => {
+        const value = raw.trim();
+        if (pending !== undefined) {
+          services.engine.approve(
+            pending.runId,
+            pending.callId,
+            /^y(es)?$/iu.test(value),
+          );
+          pending = undefined;
+        } else if (value === "/quit") {
+          rl.close();
+          return;
+        } else if (value === "/api") {
+          if (isActive())
+            append("[status] Finish or cancel the active run first.");
+          else if (!apiSetupAvailable)
+            append("[error] API setup is unavailable in this TUI host.");
+          else {
+            action = "api";
+            rl.close();
+            return;
+          }
+        } else if (value === "/help")
+          append(
+            "Commands: /api, /model ID, /models, /resume [ID], /new, /compact, /cancel, /runs, /quit.",
+          );
+        else if (value === "/models")
+          append(
+            services.models
+              .list()
+              .map(
+                (item) =>
+                  `${item.descriptor.id}:${item.available ? "ready" : item.reason}`,
+              )
+              .join("\n"),
+          );
+        else if (value.startsWith("/model ")) {
+          const requested = value.slice(7).trim();
+          if (
+            services.models
+              .list()
+              .some(
+                (item) => item.descriptor.id === requested && item.available,
+              )
+          )
+            modelId = requested;
+          else append(`[error] Model is unavailable: ${requested}`);
+        } else if (value === "/resume") {
+          const sessions = await services.sessions.list(workspace);
+          append(
+            sessions.length === 0
+              ? "[session] No saved sessions for this workspace."
+              : `${sessions
+                  .map(
+                    (item) =>
+                      `${item.id.slice(0, 8)} ${item.updatedAt} ${item.modelId} ${item.title}`,
+                  )
+                  .join("\n")}\nUse /resume <id-or-prefix>.`,
+          );
+        } else if (value.startsWith("/resume ")) {
+          if (isActive())
+            append("[status] Finish or cancel the active run first.");
+          else {
+            const session = await services.sessions.resolve(
+              value.slice(8).trim(),
+              workspace,
+            );
+            sessionId = session.id;
+            modelId = session.modelId;
+            runId = undefined;
+            unsubscribe?.();
+            unsubscribe = undefined;
+            transcript = `[session ${session.id.slice(0, 8)}] ${session.title}\n${sessionTranscript(session)}\n[session] resumed; enter the next goal.`;
+          }
+        } else if (value === "/new") {
+          if (isActive())
+            append("[status] Finish or cancel the active run first.");
+          else {
+            sessionId = undefined;
+            runId = undefined;
+            unsubscribe?.();
+            unsubscribe = undefined;
+            transcript =
+              "[session] New conversation selected; the next goal creates it.";
+          }
+        } else if (value === "/compact" && runId !== undefined)
+          services.engine.requestCompaction(runId);
+        else if (value === "/cancel" && runId !== undefined)
+          services.engine.cancel(runId);
+        else if (value === "/runs")
+          append(
+            services.engine
+              .list()
+              .map(
+                (run) =>
+                  `${run.runId.slice(0, 8)} ${run.status} ${run.modelId}`,
+              )
+              .join("\n"),
+          );
+        else if (value.startsWith("/"))
+          append(`[error] Unknown command: ${value}`);
+        else if (value.length > 0) await startGoal(value);
+        render();
+      })
+      .catch((error) => {
+        if (!closed)
+          append(
+            `[error] ${error instanceof Error ? error.message : String(error)}`,
+          );
+      });
   });
   rl.once("SIGINT", () => rl.close());
   render();
   if (initialGoal !== undefined && initialGoal.trim().length > 0)
     await startGoal(initialGoal.trim());
   await new Promise<void>((resolve) => rl.once("close", resolve));
+  await inputQueue;
   unsubscribe?.();
   if (stdout.isTTY) stdout.write("\x1b[2J\x1b[H");
+  return {
+    action,
+    ...(modelId === undefined ? {} : { modelId }),
+    ...(sessionId === undefined ? {} : { sessionId }),
+  };
+
+  function isActive(): boolean {
+    return (
+      runId !== undefined && !terminal(services.engine.snapshot(runId).status)
+    );
+  }
 }
 
 export function formatAnsiFrame(input: {
   readonly mode: "confirm" | "yolo";
   readonly modelId?: string;
+  readonly sessionId?: string;
   readonly workspace: string;
   readonly status: string;
   readonly transcript: string;
@@ -535,7 +760,7 @@ export function formatAnsiFrame(input: {
     .split("\n")
     .slice(-input.maxTranscriptLines);
   const marker = input.mode === "yolo" ? "YOLO" : "CONFIRM";
-  const header = `TMSH ${marker} | model=${input.modelId ?? "none"} | ${input.status}`;
+  const header = `TMSH ${marker} | model=${input.modelId ?? "none"} | session=${input.sessionId?.slice(0, 8) ?? "new"} | ${input.status}`;
   const body = `${header}\n${"─".repeat(Math.min(100, Math.max(20, header.length)))}\n${transcriptLines.join("\n")}\n${"─".repeat(40)}\nworkspace=${input.workspace}\n`;
   if (!input.color) return body;
   const markerColor = input.mode === "yolo" ? "\x1b[41;97m" : "\x1b[44;97m";

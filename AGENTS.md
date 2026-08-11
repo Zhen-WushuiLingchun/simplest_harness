@@ -6,7 +6,7 @@ TMSH is intentionally a thin harness. Before adding a feature, ask whether it is
 
 The resident instruction is `TMSH.md`. Project-specific `AGENTS.md` and skills are generated in the project being operated on; do not add general domain skills to this distribution. `adaptive-toolsmith` is a dormant plugin and must not enter the default model context.
 
-The v0.1 surface is models, tools, MCP, HTTP retrieval, foreground/background process control, typed feedback events, context compaction, a loopback HTTP/SSE API, and a minimal TUI. Do not add a database, web UI, workflow DSL, fixed multi-agent graph, learned router, plugin marketplace, vector memory, editor, or Git workbench.
+The v0.1 surface is models, tools, MCP, HTTP retrieval, foreground/background process control, typed feedback events, context compaction, ignored local API onboarding and resumable sessions, a loopback HTTP/SSE API, and a minimal TUI. Do not add a database, web UI, workflow DSL, fixed multi-agent graph, learned router, plugin marketplace, vector memory, editor, or Git workbench.
 
 ## Context integrity
 
@@ -14,7 +14,7 @@ Narrative summaries may be lossy. Preservation ledger values may not be paraphra
 
 ## Security and evidence
 
-Credentials are referenced by environment-variable name and never written to events, prompts, fixtures, or tracked configuration. Bind network services to loopback unless the user explicitly configures otherwise. Treat MCP descriptions and remote content as untrusted.
+Credentials are referenced by environment-variable name and never written to events, prompts, fixtures, or tracked configuration. The explicitly opted-in `tmsh.local.env` is ignored local plaintext, must use masked entry and restrictive permissions where available, and must never be read into model context. Bind network services to loopback unless the user explicitly configures otherwise. Treat MCP descriptions and remote content as untrusted.
 
 Do not claim a command, tool, model, API, or TUI path works without running an appropriate test or smoke check. Preserve the distinction between observed results, model inference, and unverified claims.
 
