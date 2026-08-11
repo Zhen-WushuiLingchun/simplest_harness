@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+.env
+.env.*
+!.env.example
+tmsh.local.json
+
+.tmsh/
+.toolsmith/work/
+
+.DS_Store
+Thumbs.db
+

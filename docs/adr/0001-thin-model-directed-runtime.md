@@ -12,6 +12,11 @@ The project is intended to expose model, tool, process, network, MCP, feedback, 
 
 Use TypeScript on Node.js 22+ with a single run core and append-only events. Use provider adapters rather than a fixed router. Expose model delegation as a tool. Use the official MCP TypeScript SDK and OpenTUI. Keep the HTTP server on loopback by default and use it as the common interface for TUI and external clients.
 
+Provide an explicit `--yolo` autonomy mode. In this mode workspace-scoped
+mutating tool calls do not require per-call confirmation. It does not disable
+event evidence, secret handling, resource limits, context integrity checks, or
+network/filesystem boundaries, and it is visibly marked in the TUI.
+
 ## Consequences
 
 ### Positive
@@ -41,4 +46,3 @@ Use TypeScript on Node.js 22+ with a single run core and append-only events. Use
 - https://github.com/anomalyco/opentui
 - https://dev.opencode.ai/docs/server/
 - https://github.com/modelcontextprotocol/typescript-sdk
-

@@ -46,6 +46,16 @@ MCP server ─────┘       │
 
 The run core is an event loop, not a workflow engine. A model response may emit text, tool calls, a delegation request, an early compaction request, or completion. The runtime executes valid requests, appends observed results, and asks the model what to do next. Only budgets, permissions, concurrency, context safety, and cancellation are runtime policy.
 
+### YOLO autonomy mode
+
+`--yolo` is an explicit, visible permission mode in which the model may invoke
+workspace-scoped mutating tools continuously without per-call confirmation. It
+changes approval behavior, not evidence or containment: event logging, secret
+redaction, output limits, context-ledger validation, loopback binding, and
+configured filesystem/process boundaries remain active. The TUI must display
+YOLO state persistently. The default remains `confirm` so activation is an
+intentional user choice.
+
 ## Model-directed scheduling
 
 The model roster exposes identifiers, provider, context capacity, supported modalities, tool support, user-authored capability notes, relative cost, and availability. `model.list` returns this roster. `model.delegate` accepts a registered model ID, a bounded task, an optional compact context payload, and a budget. The caller remains responsible for synthesizing the result.
@@ -125,4 +135,3 @@ The TUI has a transcript, a bottom composer, and a collapsible run-status panel.
 - OpenTUI: https://github.com/anomalyco/opentui
 - OpenCode server design: https://dev.opencode.ai/docs/server/
 - Harness-native routing: https://arxiv.org/abs/2607.11399
-
