@@ -8,7 +8,7 @@ import { fetchWebContent } from "../tools/http-fetch.js";
 import { saveLocalSecret } from "./local-env.js";
 
 export type ApiProvider =
-  "deepseek" | "openai" | "anthropic" | "openai-compatible";
+  "deepseek" | "openai" | "anthropic" | "opencode-go" | "openai-compatible";
 
 export interface ProviderSetup {
   readonly provider: ApiProvider;
@@ -33,6 +33,8 @@ export function providerDefaultBaseUrl(provider: ApiProvider): string {
       return "https://api.openai.com/v1";
     case "anthropic":
       return "https://api.anthropic.com/v1";
+    case "opencode-go":
+      return "https://opencode.ai/zen/go/v1";
     case "openai-compatible":
       throw new Error("OpenAI-compatible provider requires a base URL");
   }
@@ -139,24 +141,53 @@ function descriptorFor(
   apiKeyEnv: string,
   model: string,
 ): ModelDescriptor {
-  const provider =
-    setup.provider === "deepseek" ? "openai-compatible" : setup.provider;
-  const baseUrl =
-    setup.provider === "openai-compatible" || setup.provider === "deepseek"
-      ? normalizeBaseUrl(
-          setup.baseUrl ?? providerDefaultBaseUrl(setup.provider),
-        )
-      : undefined;
+  const provider = descriptorProvider(setup.provider, model);
+  const baseUrl = normalizeBaseUrl(
+    setup.baseUrl ?? providerDefaultBaseUrl(setup.provider),
+  );
   return {
     id: `${setup.connectionId}.${modelSlug(model)}`,
     provider,
     model,
     apiKeyEnv,
-    ...(baseUrl === undefined ? {} : { baseUrl }),
+    baseUrl,
     supportsTools: true,
     supportsImages: false,
-    capabilities: ["discovered", "tool-use-unverified"],
+    capabilities: [
+      "discovered",
+      "tool-use-unverified",
+      ...(setup.provider === "opencode-go"
+        ? [`opencode-go-${providerProtocol(provider)}`]
+        : []),
+    ],
   };
+}
+
+export function descriptorProvider(
+  provider: ApiProvider,
+  model: string,
+): ModelDescriptor["provider"] {
+  if (provider === "deepseek" || provider === "openai-compatible")
+    return "openai-compatible";
+  if (provider !== "opencode-go") return provider;
+  if (model === "gpt-5.6-luna") return "openai";
+  if (model.startsWith("minimax-") || model.startsWith("qwen"))
+    return "anthropic";
+  if (
+    ["grok-", "glm-", "kimi-", "deepseek-", "mimo-", "hy3"].some((prefix) =>
+      model.startsWith(prefix),
+    )
+  )
+    return "openai-compatible";
+  throw new Error(`OpenCode Go model protocol is unknown: ${model}`);
+}
+
+function providerProtocol(
+  provider: ModelDescriptor["provider"],
+): "responses" | "messages" | "chat-completions" {
+  if (provider === "openai") return "responses";
+  if (provider === "anthropic") return "messages";
+  return "chat-completions";
 }
 
 function modelSlug(model: string): string {

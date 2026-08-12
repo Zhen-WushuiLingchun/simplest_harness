@@ -56,6 +56,10 @@ const interactivePrompts: ApiWizardPrompts = {
         { name: "DeepSeek", value: "deepseek" },
         { name: "OpenAI", value: "openai" },
         { name: "Anthropic", value: "anthropic" },
+        {
+          name: "OpenCode Go（自动区分 Responses / Chat Completions / Messages）",
+          value: "opencode-go",
+        },
         { name: "其他 OpenAI-compatible API", value: "openai-compatible" },
       ],
     }),

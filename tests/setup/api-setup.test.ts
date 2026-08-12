@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  descriptorProvider,
   discoverProviderModels,
+  providerDefaultBaseUrl,
   saveApiConnection,
 } from "../../src/setup/api-setup.js";
 import {
@@ -30,6 +32,7 @@ afterEach(async () => {
   );
   delete process.env.TMSH_LAB_API_KEY;
   delete process.env.TMSH_WIZARD_API_KEY;
+  delete process.env.TMSH_OPENCODE_GO_API_KEY;
 });
 
 describe("local API setup", () => {
@@ -89,6 +92,48 @@ describe("local API setup", () => {
     expect(() => parseLocalEnvironment('KEY="one"\nKEY="two"\n')).toThrow(
       "duplicate local environment name",
     );
+  });
+
+  it("classifies OpenCode Go models by their documented API protocol", async () => {
+    expect(providerDefaultBaseUrl("opencode-go")).toBe(
+      "https://opencode.ai/zen/go/v1",
+    );
+    expect(descriptorProvider("opencode-go", "deepseek-v4-flash")).toBe(
+      "openai-compatible",
+    );
+    expect(descriptorProvider("opencode-go", "gpt-5.6-luna")).toBe("openai");
+    expect(descriptorProvider("opencode-go", "minimax-m3")).toBe("anthropic");
+    expect(descriptorProvider("opencode-go", "qwen3.8-max")).toBe("anthropic");
+    expect(() => descriptorProvider("opencode-go", "future-unknown")).toThrow(
+      "OpenCode Go model protocol is unknown",
+    );
+
+    const root = await mkdtemp(join(tmpdir(), "tmsh-opencode-go-"));
+    const result = await saveApiConnection({
+      configPath: join(root, "tmsh.local.json"),
+      setup: {
+        provider: "opencode-go",
+        connectionId: "opencode-go",
+        apiKey: "local-test-secret",
+      },
+      modelIds: ["deepseek-v4-flash", "gpt-5.6-luna", "minimax-m3"],
+    });
+
+    expect(result.descriptors.map((item) => item.provider)).toEqual([
+      "openai-compatible",
+      "openai",
+      "anthropic",
+    ]);
+    expect(
+      result.descriptors.every(
+        (item) => item.baseUrl === "https://opencode.ai/zen/go/v1",
+      ),
+    ).toBe(true);
+    expect(result.descriptors.map((item) => item.capabilities.at(-1))).toEqual([
+      "opencode-go-chat-completions",
+      "opencode-go-responses",
+      "opencode-go-messages",
+    ]);
   });
 
   it("runs the shared CLI/TUI wizard path with masked-input prompts abstracted", async () => {
