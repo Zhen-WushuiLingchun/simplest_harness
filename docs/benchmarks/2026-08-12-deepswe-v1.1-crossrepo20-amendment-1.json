@@ -22,7 +22,7 @@
     "pier": "0.3.1"
   },
   "adapter_sha256": {
-    "F:/AI/workspace/test/pier_tmsh_agent.py": "DC84F8BCB49C6CC1BDEC83F4C03A8D2F3EDD0DF3C83DCA889BB7ED6812C58CE0",
+    "F:/AI/workspace/test/pier_tmsh_agent.py": "B14DEE3029A3FA05E1B0D8679DCDDA8A614ECA75AFA141A69F2EE2595E3A6048",
     "F:/AI/workspace/test/pier_tmsh_direct_agent.py": "D4B75AB198E133C014E5C288D51CA9C8A8494C2708985828EF39D0FF53715011",
     "F:/AI/workspace/test/pier_tmsh_install_smoke_agent.py": "F4248D27426CB18C4787BADFFF43326FD844B1ED06252BAB81F83399E40DB623",
     "F:/AI/workspace/test/run-deepswe-crossrepo20.ps1": "9442AD50CE90A595D371D6F8C6E31D1884F47BB4AEBF1F47C49AB1FA2370B654"
@@ -40,6 +40,14 @@
     "adapter_smoke_model_called": false,
     "adapter_smoke_trial_result_sha256": "C17F5E4825975D28CEC12AE345A398E7AD8B0EB471C9A9024854CA091D6103EA",
     "adapter_smoke_job_result_sha256": "F8A2E7DD57C92A4FDC3BF4DCD74BC912072ADFAD47766723ED66E2046F865529"
+  },
+  "resource_failure_semantics": {
+    "max_model_calls_200": "scored_failure_run_verifier",
+    "context_limit": "scored_failure_run_verifier",
+    "agent_execution_timeout_seconds": 5400,
+    "agent_execution_timeout": "scored_failure_run_verifier",
+    "other_nonzero_exit": "infrastructure_error_fail_closed",
+    "classification_unit_tests": 3
   },
   "live_cache_smokes": [
     {
