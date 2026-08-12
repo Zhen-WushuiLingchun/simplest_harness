@@ -40,30 +40,155 @@
     "F:/AI/workspace/test/run-deepswe-crossrepo20.ps1": "1AF50CC22352D75387BE75A1B0C224B4D6000D1D4CE1FA7457590CC443321FBD"
   },
   "tasks": [
-    {"id":"pebble-durability-wait-apis","language":"go","repository":"cockroachdb/pebble","type":"storage_durability_concurrency","git_tree":"6c324907de3d5c6bef1474a66fe875b11f593cfa"},
-    {"id":"participle-grammar-conflict-analysis","language":"go","repository":"alecthomas/participle","type":"parser_static_analysis","git_tree":"9403eb3545cfca6c603f8e557f54238c5bb0f66a"},
-    {"id":"go-git-worktree-merge-conflicts","language":"go","repository":"go-git/go-git","type":"vcs_merge_state","git_tree":"4d72cceb6f55895f7849fcc782dbb0b098188159"},
-    {"id":"updo-policy-alerting","language":"go","repository":"Owloops/updo","type":"monitoring_alert_state_machine","git_tree":"f28c9edf6f45fc079f8e16d38c8d3105ec716e40"},
-    {"id":"fastapi-implicit-head-options","language":"python","repository":"fastapi/fastapi","type":"http_routing_protocol","git_tree":"d808546342a349d9b98ab6f72acc61f19e8c5d43"},
-    {"id":"cattrs-partial-structuring-recovery","language":"python","repository":"python-attrs/cattrs","type":"serialization_partial_recovery","git_tree":"ec19023bcde9bf2ac357b9b32a51b2b1a358d748"},
-    {"id":"numba-stencil-boundary-modes","language":"python","repository":"numba/numba","type":"numeric_compiler_boundaries","git_tree":"083bbd8d230999caea2ffaa81dd0db2f63afca97"},
-    {"id":"aiomonitor-task-snapshots-diff","language":"python","repository":"aio-libs/aiomonitor","type":"async_runtime_diagnostics","git_tree":"8857c48ba0d70edebc47c8f76499ab24c74ccd79"},
-    {"id":"effect-sse-httpapi-streaming","language":"typescript","repository":"Effect-TS/effect","type":"http_sse_streaming","git_tree":"5e39909c029dd386361ec2b0540419ea79e9c0d9"},
-    {"id":"ink-grid-box-layout","language":"typescript","repository":"vadimdemedes/ink","type":"terminal_ui_layout","git_tree":"0c114ccb3e2d858e5c9f72804ff7e717d2052200"},
-    {"id":"dynamodb-toolbox-lazy-recursive-schemas","language":"typescript","repository":"dynamodb-toolbox/dynamodb-toolbox","type":"recursive_schema_types","git_tree":"2301dbbd9a345b5a804e275c0187c04d023a4ebc"},
-    {"id":"vitest-duration-sharding","language":"typescript","repository":"vitest-dev/vitest","type":"test_scheduling_sharding","git_tree":"ccaae2df743b167b91de8b277df8a27b6e2ec2ea"},
-    {"id":"csstree-shorthand-expansion-compression","language":"javascript","repository":"csstree/csstree","type":"css_ast_transformation","git_tree":"7980be690e61901e79104bbe30d84cef8b13c751"},
-    {"id":"katex-multicolumn-array-spans","language":"javascript","repository":"KaTeX/KaTeX","type":"math_typesetting_rendering","git_tree":"30a679c21caaecdc04b61bc1a1e64b5ff297956f"},
-    {"id":"testem-bail-on-test-failure","language":"javascript","repository":"testem/testem","type":"test_failure_lifecycle","git_tree":"0a6ac4f18d499cee2dbc1bca0ef70dce1f1f611a"},
-    {"id":"yjs-map-conflict-detection","language":"javascript","repository":"yjs/yjs","type":"crdt_conflict_detection","git_tree":"79d3a6125bb37e767a1cf5ed7584e911e5080ba6"},
-    {"id":"boa-hierarchical-evaluation-cancellation","language":"rust","repository":"boa-dev/boa","type":"runtime_hierarchical_cancellation","git_tree":"dc904b9a1a3d8f9b699b56716e9ee76e20c555c0"},
-    {"id":"fd-deterministic-multi-key-sorting","language":"rust","repository":"sharkdp/fd","type":"cli_deterministic_sorting","git_tree":"af2fe441e0d589bab9347cad08b775ba04a5cff3"},
-    {"id":"pest-character-class-coalescing","language":"rust","repository":"pest-parser/pest","type":"parser_character_class_optimization","git_tree":"48e57ec16cfa32d26167a0151091e29864c0a849"},
-    {"id":"wasmi-trap-coredumps","language":"rust","repository":"wasmi-labs/wasmi","type":"wasm_runtime_coredump","git_tree":"0dcb14a7a1d5d64fe6f2faa410428c8379fd272d"}
+    {
+      "id": "pebble-durability-wait-apis",
+      "language": "go",
+      "repository": "cockroachdb/pebble",
+      "type": "storage_durability_concurrency",
+      "git_tree": "6c324907de3d5c6bef1474a66fe875b11f593cfa"
+    },
+    {
+      "id": "participle-grammar-conflict-analysis",
+      "language": "go",
+      "repository": "alecthomas/participle",
+      "type": "parser_static_analysis",
+      "git_tree": "9403eb3545cfca6c603f8e557f54238c5bb0f66a"
+    },
+    {
+      "id": "go-git-worktree-merge-conflicts",
+      "language": "go",
+      "repository": "go-git/go-git",
+      "type": "vcs_merge_state",
+      "git_tree": "4d72cceb6f55895f7849fcc782dbb0b098188159"
+    },
+    {
+      "id": "updo-policy-alerting",
+      "language": "go",
+      "repository": "Owloops/updo",
+      "type": "monitoring_alert_state_machine",
+      "git_tree": "f28c9edf6f45fc079f8e16d38c8d3105ec716e40"
+    },
+    {
+      "id": "fastapi-implicit-head-options",
+      "language": "python",
+      "repository": "fastapi/fastapi",
+      "type": "http_routing_protocol",
+      "git_tree": "d808546342a349d9b98ab6f72acc61f19e8c5d43"
+    },
+    {
+      "id": "cattrs-partial-structuring-recovery",
+      "language": "python",
+      "repository": "python-attrs/cattrs",
+      "type": "serialization_partial_recovery",
+      "git_tree": "ec19023bcde9bf2ac357b9b32a51b2b1a358d748"
+    },
+    {
+      "id": "numba-stencil-boundary-modes",
+      "language": "python",
+      "repository": "numba/numba",
+      "type": "numeric_compiler_boundaries",
+      "git_tree": "083bbd8d230999caea2ffaa81dd0db2f63afca97"
+    },
+    {
+      "id": "aiomonitor-task-snapshots-diff",
+      "language": "python",
+      "repository": "aio-libs/aiomonitor",
+      "type": "async_runtime_diagnostics",
+      "git_tree": "8857c48ba0d70edebc47c8f76499ab24c74ccd79"
+    },
+    {
+      "id": "effect-sse-httpapi-streaming",
+      "language": "typescript",
+      "repository": "Effect-TS/effect",
+      "type": "http_sse_streaming",
+      "git_tree": "5e39909c029dd386361ec2b0540419ea79e9c0d9"
+    },
+    {
+      "id": "ink-grid-box-layout",
+      "language": "typescript",
+      "repository": "vadimdemedes/ink",
+      "type": "terminal_ui_layout",
+      "git_tree": "0c114ccb3e2d858e5c9f72804ff7e717d2052200"
+    },
+    {
+      "id": "dynamodb-toolbox-lazy-recursive-schemas",
+      "language": "typescript",
+      "repository": "dynamodb-toolbox/dynamodb-toolbox",
+      "type": "recursive_schema_types",
+      "git_tree": "2301dbbd9a345b5a804e275c0187c04d023a4ebc"
+    },
+    {
+      "id": "vitest-duration-sharding",
+      "language": "typescript",
+      "repository": "vitest-dev/vitest",
+      "type": "test_scheduling_sharding",
+      "git_tree": "ccaae2df743b167b91de8b277df8a27b6e2ec2ea"
+    },
+    {
+      "id": "csstree-shorthand-expansion-compression",
+      "language": "javascript",
+      "repository": "csstree/csstree",
+      "type": "css_ast_transformation",
+      "git_tree": "7980be690e61901e79104bbe30d84cef8b13c751"
+    },
+    {
+      "id": "katex-multicolumn-array-spans",
+      "language": "javascript",
+      "repository": "KaTeX/KaTeX",
+      "type": "math_typesetting_rendering",
+      "git_tree": "30a679c21caaecdc04b61bc1a1e64b5ff297956f"
+    },
+    {
+      "id": "testem-bail-on-test-failure",
+      "language": "javascript",
+      "repository": "testem/testem",
+      "type": "test_failure_lifecycle",
+      "git_tree": "0a6ac4f18d499cee2dbc1bca0ef70dce1f1f611a"
+    },
+    {
+      "id": "yjs-map-conflict-detection",
+      "language": "javascript",
+      "repository": "yjs/yjs",
+      "type": "crdt_conflict_detection",
+      "git_tree": "79d3a6125bb37e767a1cf5ed7584e911e5080ba6"
+    },
+    {
+      "id": "boa-hierarchical-evaluation-cancellation",
+      "language": "rust",
+      "repository": "boa-dev/boa",
+      "type": "runtime_hierarchical_cancellation",
+      "git_tree": "dc904b9a1a3d8f9b699b56716e9ee76e20c555c0"
+    },
+    {
+      "id": "fd-deterministic-multi-key-sorting",
+      "language": "rust",
+      "repository": "sharkdp/fd",
+      "type": "cli_deterministic_sorting",
+      "git_tree": "af2fe441e0d589bab9347cad08b775ba04a5cff3"
+    },
+    {
+      "id": "pest-character-class-coalescing",
+      "language": "rust",
+      "repository": "pest-parser/pest",
+      "type": "parser_character_class_optimization",
+      "git_tree": "48e57ec16cfa32d26167a0151091e29864c0a849"
+    },
+    {
+      "id": "wasmi-trap-coredumps",
+      "language": "rust",
+      "repository": "wasmi-labs/wasmi",
+      "type": "wasm_runtime_coredump",
+      "git_tree": "0dcb14a7a1d5d64fe6f2faa410428c8379fd272d"
+    }
   ],
   "primary_metric": "mean_task_pass_rate_difference",
   "primary_metric_formula": "(1/20) * sum_i((T_i/4) - (P_i/4))",
-  "bootstrap": {"unit":"task","resamples":100000,"seed":20260812,"interval":0.95},
+  "bootstrap": {
+    "unit": "task",
+    "resamples": 100000,
+    "seed": 20260812,
+    "interval": 0.95
+  },
   "public_sources": {
     "leaderboard": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
     "trials": "https://deepswe.datacurve.ai/artifacts/v1.1/trials.json",

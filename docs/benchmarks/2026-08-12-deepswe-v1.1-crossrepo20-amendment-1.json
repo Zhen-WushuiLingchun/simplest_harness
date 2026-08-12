@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "amends_selection_commit": "97eb649",
+  "public_control_commit": "58164c1",
+  "formal_trials_started": false,
+  "unchanged": [
+    "tasks",
+    "model_id",
+    "provider",
+    "attempts_per_task",
+    "primary_metric",
+    "retry_rules",
+    "failure_classification",
+    "verifier"
+  ],
+  "treatment_commit_before": "33cf1b975f97e77f87868a2189758d8dd4127520",
+  "treatment_commit_after": "709ed7905aea0ac95d4d9c5d094a7e1c9f0e406a",
+  "treatment_change": "Preserve provider cache read, miss, and write token counters in usage events and expose cache reads to Pier. No prompt, tool, sampling, compaction, resource-limit, or verifier change.",
+  "runtime": {
+    "node": "24.19.0",
+    "pnpm": "11.21.0",
+    "pier": "0.3.1"
+  },
+  "adapter_sha256": {
+    "F:/AI/workspace/test/pier_tmsh_agent.py": "DC84F8BCB49C6CC1BDEC83F4C03A8D2F3EDD0DF3C83DCA889BB7ED6812C58CE0",
+    "F:/AI/workspace/test/pier_tmsh_direct_agent.py": "D4B75AB198E133C014E5C288D51CA9C8A8494C2708985828EF39D0FF53715011",
+    "F:/AI/workspace/test/pier_tmsh_install_smoke_agent.py": "F4248D27426CB18C4787BADFFF43326FD844B1ED06252BAB81F83399E40DB623",
+    "F:/AI/workspace/test/run-deepswe-crossrepo20.ps1": "9442AD50CE90A595D371D6F8C6E31D1884F47BB4AEBF1F47C49AB1FA2370B654"
+  },
+  "verification": {
+    "typecheck": "pass",
+    "build": "pass",
+    "test_files": 22,
+    "tests": 66,
+    "format_check": "pass",
+    "git_diff_check": "pass",
+    "adapter_smoke_job": "crossrepo20-adapter-cache-smoke-v1-20260812",
+    "adapter_smoke_completed": 1,
+    "adapter_smoke_errors": 0,
+    "adapter_smoke_model_called": false,
+    "adapter_smoke_trial_result_sha256": "C17F5E4825975D28CEC12AE345A398E7AD8B0EB471C9A9024854CA091D6103EA",
+    "adapter_smoke_job_result_sha256": "F8A2E7DD57C92A4FDC3BF4DCD74BC912072ADFAD47766723ED66E2046F865529"
+  },
+  "live_cache_smokes": [
+    {
+      "run_id": "ce658a3b-1c1a-4a25-a5f3-c46d9a2b071e",
+      "input_tokens": 2510,
+      "cache_read_tokens": 2432,
+      "cache_miss_tokens": 78,
+      "output_tokens": 55,
+      "calculated_cost_usd": "0.0000331296"
+    },
+    {
+      "run_id": "c7a90013-cf80-46ac-8cca-250184b5ef52",
+      "input_tokens": 2510,
+      "cache_read_tokens": 2432,
+      "cache_miss_tokens": 78,
+      "output_tokens": 54,
+      "calculated_cost_usd": "0.0000328496"
+    }
+  ]
+}
