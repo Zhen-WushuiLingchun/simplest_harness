@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline/promises";
+import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { stdin, stdout } from "node:process";
@@ -16,6 +17,7 @@ import { runApiSetupWizard } from "./setup/wizard.js";
 import { relaunchTuiWithBun } from "./tui/bun-runtime.js";
 
 const distributionRoot = fileURLToPath(new URL("../", import.meta.url));
+const MAX_GOAL_FILE_BYTES = 2_000_000;
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   const command = argv[0] ?? "help";
@@ -96,7 +98,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
   if (command === "run") {
-    const goal = positional(args).join(" ").trim();
+    const goal = await readRunGoal(args, flags);
     if (goal.length === 0) throw new Error("tmsh run requires a goal");
     const runtime = await createRuntime(config, distributionRoot);
     if (config.autonomy.mode === "yolo")
@@ -258,6 +260,26 @@ export async function prepareRunSession(input: {
   return { sessionId: created.id, modelId };
 }
 
+export async function readRunGoal(
+  args: readonly string[],
+  flags: ReadonlyMap<string, string | true>,
+): Promise<string> {
+  const inline = positional(args).join(" ").trim();
+  const goalFile = stringFlag(flags, "goal-file");
+  if (goalFile === undefined) return inline;
+  if (inline.length > 0)
+    throw new Error(
+      "tmsh run accepts either an inline goal or --goal-file, not both",
+    );
+  const path = resolve(goalFile);
+  const info = await stat(path);
+  if (!info.isFile())
+    throw new Error(`goal file is not a regular file: ${path}`);
+  if (info.size > MAX_GOAL_FILE_BYTES)
+    throw new Error(`goal file exceeds ${MAX_GOAL_FILE_BYTES} bytes: ${path}`);
+  return (await readFile(path, "utf8")).trim();
+}
+
 function waitForSignal(): Promise<void> {
   return new Promise((resolveSignal) => {
     const done = (): void => resolveSignal();
@@ -267,7 +289,7 @@ function waitForSignal(): Promise<void> {
 }
 
 function helpText(): string {
-  return `TMSH - the most simplest model-directed harness\n\nUsage:\n  tmsh api [--config PATH]\n  tmsh run "goal" [--model ID] [--workspace PATH] [--resume ID] [--yolo] [--config PATH]\n  tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh serve [--yolo] [--config PATH]\n  tmsh mcp [--config PATH]\n  tmsh models [--config PATH]\n  tmsh tools [--config PATH]\n  tmsh doctor [--config PATH]\n\nEvery CLI run is saved in the ignored local session store; --resume ID continues one by UUID or prefix.\nInside the TUI, /api configures providers and /resume restores ignored local sessions.\n--yolo explicitly bypasses per-call approval for mutating/external tools; audit and compaction validation remain active.\n`;
+  return `TMSH - the most simplest model-directed harness\n\nUsage:\n  tmsh api [--config PATH]\n  tmsh run "goal" [--model ID] [--workspace PATH] [--resume ID] [--yolo] [--config PATH]\n  tmsh run --goal-file PATH [--model ID] [--workspace PATH] [--resume ID] [--yolo] [--config PATH]\n  tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh serve [--yolo] [--config PATH]\n  tmsh mcp [--config PATH]\n  tmsh models [--config PATH]\n  tmsh tools [--config PATH]\n  tmsh doctor [--config PATH]\n\nEvery CLI run is saved in the ignored local session store; --resume ID continues one by UUID or prefix.\n--goal-file reads a bounded local UTF-8 goal without placing large handoffs in the process argv.\nInside the TUI, /api configures providers and /resume restores ignored local sessions.\n--yolo explicitly bypasses per-call approval for mutating/external tools; audit and compaction validation remain active.\n`;
 }
 
 if (

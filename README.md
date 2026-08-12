@@ -158,6 +158,7 @@ pnpm start tools --config tmsh.local.json
 ```text
 tmsh api [--config PATH]
 tmsh run "goal" [--model ID] [--workspace PATH] [--resume ID] [--yolo] [--config PATH]
+tmsh run --goal-file PATH [--model ID] [--workspace PATH] [--resume ID] [--yolo] [--config PATH]
 tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]
 tmsh serve [--yolo] [--config PATH]
 tmsh mcp [--config PATH]
@@ -183,6 +184,7 @@ tmsh doctor [--config PATH]
 - `--workspace PATH`：指定模型操作的项目目录，默认当前目录。
 - `--model ID`：覆盖 `defaultModel`。
 - `--resume ID`：按完整 UUID 或至少 4 位的唯一前缀接续 CLI 会话；未指定时自动创建并打印 session ID。
+- `--goal-file PATH`：从最大 2,000,000 bytes 的本地 UTF-8 文件读取目标；与内联目标互斥，适合不应塞入进程 argv 的大型恢复交接。
 - `--yolo`：本次运行显式切换到 YOLO；它不会悄悄由模型自己开启。
 
 ## TUI
