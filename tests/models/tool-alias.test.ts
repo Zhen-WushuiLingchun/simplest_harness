@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   repairDoubleEncodedToolInput,
+  resolveProviderToolName,
   toolAliases,
 } from "../../src/models/adapter.js";
 import type { ToolSummary } from "../../src/core/tool-registry.js";
@@ -59,5 +60,58 @@ describe("provider tool aliases", () => {
       repairDoubleEncodedToolInput(JSON.stringify("plain text")),
     ).toBeUndefined();
     expect(repairDoubleEncodedToolInput("not json")).toBeUndefined();
+  });
+
+  it("maps a uniquely shortened provider tool name back to its declared alias", () => {
+    const aliases = toolAliases([
+      {
+        name: "process.start",
+        description: "start",
+        inputSchema: { type: "object" },
+        effect: "write",
+      },
+      {
+        name: "context.status",
+        description: "status",
+        inputSchema: { type: "object" },
+        effect: "read",
+      },
+    ]);
+    const declared = aliases.canonicalToProvider.get("process.start")!;
+
+    expect(resolveProviderToolName("process_start", aliases)).toEqual({
+      canonicalName: "process.start",
+      providerName: declared,
+    });
+    expect(resolveProviderToolName(declared, aliases)).toEqual({
+      canonicalName: "process.start",
+      providerName: declared,
+    });
+    expect(resolveProviderToolName("unknown", aliases)).toEqual({
+      canonicalName: "unknown",
+      providerName: "unknown",
+    });
+  });
+
+  it("does not guess when a shortened provider tool name is ambiguous", () => {
+    const aliases = toolAliases([
+      {
+        name: "process.start",
+        description: "one",
+        inputSchema: { type: "object" },
+        effect: "write",
+      },
+      {
+        name: "process_start",
+        description: "two",
+        inputSchema: { type: "object" },
+        effect: "write",
+      },
+    ]);
+
+    expect(resolveProviderToolName("process_start", aliases)).toEqual({
+      canonicalName: "process_start",
+      providerName: "process_start",
+    });
   });
 });

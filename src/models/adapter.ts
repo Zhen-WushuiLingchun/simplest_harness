@@ -93,15 +93,22 @@ export class AiSdkModelAdapter implements ModelAdapter {
         ? {}
         : { maxOutputTokens: input.maxOutputTokens }),
     });
+    const toolCalls = result.toolCalls.map((call) => {
+      const resolved = resolveProviderToolName(call.toolName, aliases);
+      return {
+        id: call.toolCallId,
+        name: resolved.canonicalName,
+        providerName: resolved.providerName,
+        input: toJsonValue(call.input),
+      };
+    });
     return {
       text: result.text,
-      responseMessages: result.response.messages,
-      toolCalls: result.toolCalls.map((call) => ({
-        id: call.toolCallId,
-        name: aliases.providerToCanonical.get(call.toolName) ?? call.toolName,
-        providerName: call.toolName,
-        input: toJsonValue(call.input),
-      })),
+      responseMessages: normalizeResponseToolNames(
+        result.response.messages,
+        toolCalls,
+      ),
+      toolCalls,
       usage: {
         ...(result.usage.inputTokens === undefined
           ? {}
@@ -239,6 +246,46 @@ export function repairDoubleEncodedToolInput(
   } catch {
     return undefined;
   }
+}
+
+export function resolveProviderToolName(
+  providerName: string,
+  aliases: ReturnType<typeof toolAliases>,
+): { readonly canonicalName: string; readonly providerName: string } {
+  const exact = aliases.providerToCanonical.get(providerName);
+  if (exact !== undefined) return { canonicalName: exact, providerName };
+
+  const matches = [...aliases.canonicalToProvider.entries()].filter(
+    ([, alias]) => alias.slice(0, alias.lastIndexOf("_")) === providerName,
+  );
+  if (matches.length !== 1)
+    return { canonicalName: providerName, providerName };
+  return { canonicalName: matches[0]![0], providerName: matches[0]![1] };
+}
+
+function normalizeResponseToolNames(
+  messages: readonly ModelMessage[],
+  calls: readonly ModelToolCall[],
+): ModelMessage[] {
+  const byId = new Map(calls.map((call) => [call.id, call]));
+  return messages.map((message) => {
+    if (message.role !== "assistant" || typeof message.content === "string")
+      return message;
+    return {
+      ...message,
+      content: message.content.map((part) => {
+        if (part.type !== "tool-call") return part;
+        const call = byId.get(part.toolCallId);
+        return call === undefined
+          ? part
+          : {
+              ...part,
+              toolName: call.providerName ?? call.name,
+              input: call.input,
+            };
+      }),
+    };
+  });
 }
 
 export function toolAliases(tools: readonly ToolSummary[]): {
