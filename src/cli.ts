@@ -6,6 +6,7 @@ import { stdin, stdout } from "node:process";
 import { TmshApiServer } from "./api/server.js";
 import { resolveConfig, type TmshConfig } from "./core/config.js";
 import { loadConfig } from "./core/config-file.js";
+import type { SessionStore } from "./core/session-store.js";
 import type { RunEvent } from "./core/types.js";
 import { createRuntime } from "./runtime/runtime.js";
 import { runTmshTui } from "./tui/app.js";
@@ -100,11 +101,25 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const runtime = await createRuntime(config, distributionRoot);
     if (config.autonomy.mode === "yolo")
       stdout.write("WARNING: YOLO mode is active.\n");
-    const modelId = stringFlag(flags, "model");
+    const workspace = resolve(stringFlag(flags, "workspace") ?? process.cwd());
+    const requestedModelId = stringFlag(flags, "model");
+    const resumeReference = stringFlag(flags, "resume");
+    const session = await prepareRunSession({
+      sessions: runtime.sessions,
+      workspace,
+      goal,
+      ...(requestedModelId === undefined ? {} : { requestedModelId }),
+      ...(config.defaultModel === undefined
+        ? {}
+        : { defaultModelId: config.defaultModel }),
+      ...(resumeReference === undefined ? {} : { resumeReference }),
+    });
+    stdout.write(`TMSH session: ${session.sessionId}\n`);
     const runId = await runtime.engine.start({
       goal,
-      workspace: resolve(stringFlag(flags, "workspace") ?? process.cwd()),
-      ...(modelId === undefined ? {} : { modelId }),
+      workspace,
+      modelId: session.modelId,
+      sessionId: session.sessionId,
       autonomy: config.autonomy.mode,
     });
     const seen = new Set<string>();
@@ -214,6 +229,35 @@ function stringFlag(
   return value;
 }
 
+export async function prepareRunSession(input: {
+  readonly sessions: Pick<SessionStore, "create" | "resolve">;
+  readonly workspace: string;
+  readonly goal: string;
+  readonly requestedModelId?: string;
+  readonly defaultModelId?: string;
+  readonly resumeReference?: string;
+}): Promise<{ readonly sessionId: string; readonly modelId: string }> {
+  if (input.resumeReference !== undefined) {
+    const resumed = await input.sessions.resolve(
+      input.resumeReference,
+      input.workspace,
+    );
+    return {
+      sessionId: resumed.id,
+      modelId: input.requestedModelId ?? resumed.modelId,
+    };
+  }
+  const modelId = input.requestedModelId ?? input.defaultModelId;
+  if (modelId === undefined)
+    throw new Error("no model selected and no defaultModel configured");
+  const created = await input.sessions.create({
+    title: input.goal,
+    workspace: input.workspace,
+    modelId,
+  });
+  return { sessionId: created.id, modelId };
+}
+
 function waitForSignal(): Promise<void> {
   return new Promise((resolveSignal) => {
     const done = (): void => resolveSignal();
@@ -223,7 +267,7 @@ function waitForSignal(): Promise<void> {
 }
 
 function helpText(): string {
-  return `TMSH - the most simplest model-directed harness\n\nUsage:\n  tmsh api [--config PATH]\n  tmsh run "goal" [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh serve [--yolo] [--config PATH]\n  tmsh mcp [--config PATH]\n  tmsh models [--config PATH]\n  tmsh tools [--config PATH]\n  tmsh doctor [--config PATH]\n\nInside the TUI, /api configures providers and /resume restores ignored local sessions.\n--yolo explicitly bypasses per-call approval for mutating/external tools; audit and compaction validation remain active.\n`;
+  return `TMSH - the most simplest model-directed harness\n\nUsage:\n  tmsh api [--config PATH]\n  tmsh run "goal" [--model ID] [--workspace PATH] [--resume ID] [--yolo] [--config PATH]\n  tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]\n  tmsh serve [--yolo] [--config PATH]\n  tmsh mcp [--config PATH]\n  tmsh models [--config PATH]\n  tmsh tools [--config PATH]\n  tmsh doctor [--config PATH]\n\nEvery CLI run is saved in the ignored local session store; --resume ID continues one by UUID or prefix.\nInside the TUI, /api configures providers and /resume restores ignored local sessions.\n--yolo explicitly bypasses per-call approval for mutating/external tools; audit and compaction validation remain active.\n`;
 }
 
 if (

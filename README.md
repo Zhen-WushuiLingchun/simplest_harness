@@ -157,7 +157,7 @@ pnpm start tools --config tmsh.local.json
 
 ```text
 tmsh api [--config PATH]
-tmsh run "goal" [--model ID] [--workspace PATH] [--yolo] [--config PATH]
+tmsh run "goal" [--model ID] [--workspace PATH] [--resume ID] [--yolo] [--config PATH]
 tmsh tui ["initial goal"] [--model ID] [--workspace PATH] [--yolo] [--config PATH]
 tmsh serve [--yolo] [--config PATH]
 tmsh mcp [--config PATH]
@@ -169,7 +169,7 @@ tmsh doctor [--config PATH]
 | 命令     | 用途                                                                |
 | -------- | ------------------------------------------------------------------- |
 | `api`    | 隐藏输入 Key、枚举模型并更新本地忽略配置                            |
-| `run`    | 启动一个任务，输出运行事件和最终结果                                |
+| `run`    | 启动一个任务，输出运行事件和最终结果，并默认创建持久会话            |
 | `tui`    | 启动交互式终端界面，可连续提交并恢复长期会话                        |
 | `serve`  | 启动 loopback HTTP/SSE API，默认 `127.0.0.1:4097`                   |
 | `mcp`    | 通过 stdio 启动 TMSH MCP Server                                     |
@@ -182,6 +182,7 @@ tmsh doctor [--config PATH]
 - `--config PATH`：指定 JSON 配置；未指定时按程序默认规则加载。
 - `--workspace PATH`：指定模型操作的项目目录，默认当前目录。
 - `--model ID`：覆盖 `defaultModel`。
+- `--resume ID`：按完整 UUID 或至少 4 位的唯一前缀接续 CLI 会话；未指定时自动创建并打印 session ID。
 - `--yolo`：本次运行显式切换到 YOLO；它不会悄悄由模型自己开启。
 
 ## TUI
@@ -227,7 +228,7 @@ OpenCode Go 的 Chat Completions 描述符带有 `opencode-go-chat-completions` 
 
 ### `/resume` 的持久化语义
 
-TUI 的第一条目标自动创建 session。每个完成的模型/工具边界和成功压缩都会原子更新 `.tmsh/sessions/<uuid>.json`，其中包含完整 `ModelMessage[]`、模型 ID、workspace 和经过 digest 校验的 preservation ledger。恢复时不是只显示旧聊天文本，而是把历史消息与 ledger 重新交给 Run Engine。
+TUI 的第一条目标和每次新的 `tmsh run` 都会自动创建 session；CLI 会先打印 `TMSH session: <uuid>`，进程意外退出后可用 `tmsh run "继续完成原目标" --resume <uuid-or-prefix>` 接续。每个完成的模型/工具边界和成功压缩都会原子更新 `.tmsh/sessions/<uuid>.json`，其中包含完整 `ModelMessage[]`、模型 ID、workspace 和经过 digest 校验的 preservation ledger。恢复时不是只显示旧聊天文本，而是把历史消息与 ledger 重新交给 Run Engine。
 
 恢复会话后的压缩源同时绑定本次 run 事件 digest 和恢复前 session state digest，避免把跨进程历史错误归因成当前单次 run。session 是连续性状态；`.tmsh/runs/<runId>/events.jsonl` 和 compaction artifact 仍是工具调用、负面结果与压缩边界的审计证据。
 
