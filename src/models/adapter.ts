@@ -82,6 +82,12 @@ export class AiSdkModelAdapter implements ModelAdapter {
       system: input.system,
       messages: [...input.messages],
       tools,
+      repairToolCall: async ({ toolCall }) => {
+        const repairedInput = repairDoubleEncodedToolInput(toolCall.input);
+        return repairedInput === undefined
+          ? null
+          : { ...toolCall, input: repairedInput };
+      },
       abortSignal: input.signal,
       ...(input.maxOutputTokens === undefined
         ? {}
@@ -213,6 +219,26 @@ function readApiKey(descriptor: ModelDescriptor): string {
 
 function toJsonValue(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+/**
+ * Some OpenAI-compatible gateways occasionally JSON-encode an already encoded
+ * tool argument object. AI SDK then sees a JSON string where the tool schema
+ * requires an object. Repair only that narrow, lossless shape and leave every
+ * other invalid input to normal schema validation.
+ */
+export function repairDoubleEncodedToolInput(
+  input: string,
+): string | undefined {
+  try {
+    const once: unknown = JSON.parse(input);
+    if (typeof once !== "string") return undefined;
+    const twice: unknown = JSON.parse(once);
+    if (twice === null || typeof twice !== "object") return undefined;
+    return JSON.stringify(twice);
+  } catch {
+    return undefined;
+  }
 }
 
 export function toolAliases(tools: readonly ToolSummary[]): {

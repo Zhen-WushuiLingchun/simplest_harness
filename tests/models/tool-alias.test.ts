@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { toolAliases } from "../../src/models/adapter.js";
+import {
+  repairDoubleEncodedToolInput,
+  toolAliases,
+} from "../../src/models/adapter.js";
 import type { ToolSummary } from "../../src/core/tool-registry.js";
 
 describe("provider tool aliases", () => {
@@ -36,5 +39,25 @@ describe("provider tool aliases", () => {
       const alias = aliases.canonicalToProvider.get(tool.name)!;
       expect(aliases.providerToCanonical.get(alias)).toBe(tool.name);
     }
+  });
+
+  it("repairs only double-encoded JSON tool objects", () => {
+    const object = {
+      args: ["-c", "grep -n test file.go"],
+      cwd: "/app",
+      file: "/bin/sh",
+    };
+    const repaired = repairDoubleEncodedToolInput(
+      JSON.stringify(JSON.stringify(object)),
+    );
+
+    expect(repaired).toBe(JSON.stringify(object));
+    expect(
+      repairDoubleEncodedToolInput(JSON.stringify(object)),
+    ).toBeUndefined();
+    expect(
+      repairDoubleEncodedToolInput(JSON.stringify("plain text")),
+    ).toBeUndefined();
+    expect(repairDoubleEncodedToolInput("not json")).toBeUndefined();
   });
 });
