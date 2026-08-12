@@ -25,6 +25,46 @@ afterEach(async () => {
 });
 
 describe("AI SDK provider compatibility", () => {
+  it("preserves exact DeepSeek cache hit and miss usage", async () => {
+    const baseUrl = await chatServer(async () => ({
+      status: 200,
+      body: {
+        id: "chatcmpl-cache-usage",
+        object: "chat.completion",
+        created: 1,
+        model: "fixture-model",
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: "ok" },
+            finish_reason: "stop",
+          },
+        ],
+        usage: {
+          prompt_tokens: 20,
+          completion_tokens: 1,
+          total_tokens: 21,
+          prompt_cache_hit_tokens: 18,
+          prompt_cache_miss_tokens: 2,
+        },
+      },
+    }));
+    const adapter = fixtureAdapter(baseUrl);
+
+    const result = await adapter.complete(
+      turn([{ role: "user", content: "inspect" }]),
+    );
+
+    expect(result.usage).toEqual({
+      inputTokens: 20,
+      outputTokens: 1,
+      totalTokens: 21,
+      cacheReadTokens: 18,
+      cacheMissTokens: 2,
+      estimated: false,
+    });
+  });
+
   it("replays reasoning and matched parallel tool results", async () => {
     const bodies: ChatRequest[] = [];
     const baseUrl = await chatServer(async (body, responseNumber) => {

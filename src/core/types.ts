@@ -63,5 +63,8 @@ export interface TokenUsage {
   readonly inputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
+  readonly cacheReadTokens?: number;
+  readonly cacheMissTokens?: number;
+  readonly cacheWriteTokens?: number;
   readonly estimated: boolean;
 }

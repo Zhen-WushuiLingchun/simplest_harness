@@ -105,6 +105,10 @@ export class AiSdkModelAdapter implements ModelAdapter {
         input: normalizeParsedToolInput(call.input),
       };
     });
+    // Aggregate usage intentionally drops provider `raw` fields in AI SDK.
+    // TMSH executes tools itself, so each adapter call has exactly one SDK
+    // step; read that step to preserve DeepSeek's exact cache counters.
+    const cacheUsage = extractCacheUsage(result.finalStep.usage);
     return {
       text: result.text,
       responseMessages: normalizeResponseToolNames(
@@ -128,6 +132,7 @@ export class AiSdkModelAdapter implements ModelAdapter {
         ...(result.usage.totalTokens === undefined
           ? {}
           : { totalTokens: result.usage.totalTokens }),
+        ...cacheUsage,
         estimated: false,
       },
       finishReason: result.finishReason,
@@ -150,6 +155,53 @@ export class AiSdkModelAdapter implements ModelAdapter {
     });
     return result.output;
   }
+}
+
+function extractCacheUsage(usage: {
+  readonly inputTokenDetails: {
+    readonly noCacheTokens: number | undefined;
+    readonly cacheReadTokens: number | undefined;
+    readonly cacheWriteTokens: number | undefined;
+  };
+  readonly raw?: Record<string, unknown>;
+}): Pick<
+  TokenUsage,
+  "cacheReadTokens" | "cacheMissTokens" | "cacheWriteTokens"
+> {
+  const deepSeekHit = rawTokenCount(usage.raw, "prompt_cache_hit_tokens");
+  const deepSeekMiss = rawTokenCount(usage.raw, "prompt_cache_miss_tokens");
+  const standardDetails = usage.raw?.prompt_tokens_details;
+  const reportsStandardCache =
+    standardDetails !== null &&
+    typeof standardDetails === "object" &&
+    "cached_tokens" in standardDetails;
+  const reportsCache =
+    deepSeekHit !== undefined ||
+    deepSeekMiss !== undefined ||
+    reportsStandardCache ||
+    (usage.inputTokenDetails.cacheReadTokens ?? 0) > 0 ||
+    (usage.inputTokenDetails.cacheWriteTokens ?? 0) > 0;
+  if (!reportsCache) return {};
+
+  const cacheReadTokens =
+    deepSeekHit ?? usage.inputTokenDetails.cacheReadTokens;
+  const cacheMissTokens = deepSeekMiss ?? usage.inputTokenDetails.noCacheTokens;
+  const cacheWriteTokens = usage.inputTokenDetails.cacheWriteTokens;
+  return {
+    ...(cacheReadTokens === undefined ? {} : { cacheReadTokens }),
+    ...(cacheMissTokens === undefined ? {} : { cacheMissTokens }),
+    ...(cacheWriteTokens === undefined ? {} : { cacheWriteTokens }),
+  };
+}
+
+function rawTokenCount(
+  raw: Record<string, unknown> | undefined,
+  key: string,
+): number | undefined {
+  const value = raw?.[key];
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
 }
 
 export class FakeModelAdapter implements ModelAdapter {
