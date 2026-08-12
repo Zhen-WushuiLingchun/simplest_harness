@@ -109,6 +109,37 @@ describe("AI SDK provider compatibility", () => {
     });
   });
 
+  it("does not replay SDK tool errors for a uniquely repairable name", async () => {
+    const baseUrl = await chatServer(async () =>
+      toolResponse({
+        calls: [
+          {
+            id: "call-invalid-input",
+            name: "process_start",
+            arguments: JSON.stringify({ file: "pwd" }),
+          },
+        ],
+      }),
+    );
+    const adapter = fixtureAdapter(baseUrl);
+
+    const result = await adapter.complete(
+      turn([{ role: "user", content: "inspect" }]),
+    );
+
+    expect(result.toolCalls).toMatchObject([
+      {
+        id: "call-invalid-input",
+        name: "process.start",
+        providerName: "process_start_6f0b1c6ff5",
+        input: { file: "pwd" },
+      },
+    ]);
+    expect(result.responseMessages.map((message) => message.role)).toEqual([
+      "assistant",
+    ]);
+  });
+
   it.each([
     {
       label: "orphan result",
@@ -289,6 +320,7 @@ function toolResponse(input: {
   readonly reasoning?: string;
   readonly calls: readonly {
     readonly id: string;
+    readonly name?: string;
     readonly arguments: string;
   }[];
 }): FixtureResponse {
@@ -312,7 +344,7 @@ function toolResponse(input: {
               id: call.id,
               type: "function",
               function: {
-                name: "process_start_6f0b1c6ff5",
+                name: call.name ?? "process_start_6f0b1c6ff5",
                 arguments: call.arguments,
               },
             })),

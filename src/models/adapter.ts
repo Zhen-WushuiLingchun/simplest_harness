@@ -108,7 +108,13 @@ export class AiSdkModelAdapter implements ModelAdapter {
     return {
       text: result.text,
       responseMessages: normalizeResponseToolNames(
-        result.response.messages,
+        // AI SDK appends tool-role error messages when it cannot validate a
+        // provider tool call. RunEngine is the sole executor and result owner,
+        // including unknown/invalid calls, so replaying those SDK-generated
+        // results would duplicate the same toolCallId on the next turn.
+        result.response.messages.filter(
+          (message) => message.role === "assistant",
+        ),
         toolCalls,
       ),
       toolCalls,

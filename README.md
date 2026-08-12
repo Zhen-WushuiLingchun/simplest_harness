@@ -221,7 +221,7 @@ TUI 使用 [`@opentui/core`](https://github.com/anomalyco/opentui)，与 OpenCod
 
 这里的 OpenCode 原生配置名写作 `opencode-go/<model-id>`；TMSH 为了区分同名连接，内部描述符仍写成 `<connection-id>.<model-id>`，例如默认连接名下的 `opencode-go.deepseek-v4-flash`。实际发送给 API 的原始模型 ID 仍是 `deepseek-v4-flash`。如果模型列表出现不属于上述已知协议族的新 ID，向导会失败关闭并要求先更新协议映射，不会猜测协议。
 
-OpenCode Go 的 Chat Completions 描述符带有 `opencode-go-chat-completions` capability。该兼容层只处理接口事实，不改变模型工作流：发送前校验 `assistant.tool_calls → tool result` 的 exactly-once 配对；provider 将双重编码 JSON 对象解析成字符串时，再进行一次仅限对象的无损恢复；assistant 的 reasoning part 原样保留。若本地历史已通过结构校验，而 OpenCode Go 仍返回“tool 缺少前置 tool_calls”“重复 tool_call_id”或“thinking mode 缺少 reasoning_content”这三类已观察到的 400，TMSH 会明确报告 `OpenCode Go compatibility error`，保留原错误且不自动重试。它不会伪造 reasoning、插入虚假 assistant 轮或把基建失败计作模型失败。
+OpenCode Go 的 Chat Completions 描述符带有 `opencode-go-chat-completions` capability。该兼容层只处理接口事实，不改变模型工作流：发送前校验 `assistant.tool_calls → tool result` 的 exactly-once 配对；provider 将双重编码 JSON 对象解析成字符串时，再进行一次仅限对象的无损恢复；assistant 的 reasoning part 原样保留；模型把唯一可判定的稳定工具别名截短时，恢复成原别名。AI SDK 会为它暂时无法识别的工具调用附加 SDK 自己的 `tool` 错误消息，但 TMSH 的 Run Engine 才是唯一的工具执行者和结果所有者，因此适配器只接收 SDK 返回的 assistant 消息，所有 tool result 都由 Run Engine 恰好生成一次，避免同一 `tool_call_id` 被重复回传。若本地历史已通过结构校验，而 OpenCode Go 仍返回“tool 缺少前置 tool_calls”“重复 tool_call_id”或“thinking mode 缺少 reasoning_content”这三类已观察到的 400，TMSH 会明确报告 `OpenCode Go compatibility error`，保留原错误且不自动重试。它不会伪造 reasoning、插入虚假 assistant 轮或把基建失败计作模型失败。
 
 提供商的模型列表通常不包含可靠的上下文长度、价格、视觉能力和工具调用能力元数据。向导不会编造这些数值：自动生成的描述会标记 `discovered` 和 `tool-use-unverified`，未知上下文容量将使比例式自动压缩保持关闭，用户可依据官方规格继续编辑 `tmsh.local.json`。
 
@@ -695,7 +695,7 @@ git diff --check
 
 本版本交付前已观察到：
 
-- 21 个测试文件、63 个测试通过，其中兼容性 fixture 会捕获真实 Chat Completions 第二轮请求，验证 reasoning 回传、并行工具 ID 配对、双重编码对象修复、发送前历史不变量和 OpenCode 错误分类；
+- 22 个测试文件、65 个测试通过，其中兼容性 fixture 会捕获真实 Chat Completions 第二轮请求，验证 reasoning 回传、并行工具 ID 配对、双重编码对象修复、截短工具名后的 SDK 错误去重、真实 Run Engine 的结果单一所有权、发送前历史不变量和 OpenCode 错误分类；
 - TypeScript 类型检查、构建和格式检查通过；
 - DeepSeek 真实模型完成基础回复、工具调用和压缩 smoke；
 - OpenCode Go 真实 `/models` 枚举发现 `25` 个当前账户可见模型，其中自动归类为 Chat Completions `16`、Responses `1`、Messages `8`；`deepseek-v4-flash` 与 `deepseek-v4-pro` 均存在；
