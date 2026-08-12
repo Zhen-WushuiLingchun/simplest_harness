@@ -209,6 +209,8 @@ TUI 使用 [`@opentui/core`](https://github.com/anomalyco/opentui)，与 OpenCod
 
 当前向导支持 DeepSeek、OpenAI、Anthropic、OpenCode Go 和用户指定的 OpenAI-compatible Base URL。它不会把一把 Key 发送给多个厂商“猜提供商”，因为这会泄露凭据；用户先选定服务边界，TMSH 再用该 Key 调用对应的模型列表端点，这里的“自动识别模型”指**认证后枚举账户实际可见的模型 ID**。
 
+截至 2026-08-12，标准 DeepSeek API 的正式模型 ID 是 `deepseek-v4-flash` 和 `deepseek-v4-pro`，OpenAI-compatible Base URL 为 `https://api.deepseek.com`。旧别名 `deepseek-chat`、`deepseek-reasoner` 已于 2026-07-24 退役；新配置和可复现实验不应继续使用旧别名。V4 的 thinking-mode 工具轮要求把该轮 assistant 的 `reasoning_content` 完整回传给后续请求，TMSH 会把它保存在模型消息中，但不会把内容复制进反馈事件。
+
 选择 `OpenCode Go` 时，向导固定使用 `https://opencode.ai/zen/go/v1/models`，不会误用通用 Zen endpoint。枚举后仍由用户勾选一个或多个模型；同一把 Key 下的模型按 OpenCode Go 公布的协议自动生成 TMSH 描述：
 
 | API 协议                           | 当前识别规则                                                | 端点                |
@@ -218,6 +220,8 @@ TUI 使用 [`@opentui/core`](https://github.com/anomalyco/opentui)，与 OpenCod
 | OpenAI-compatible Chat Completions | `grok-*`、`glm-*`、`kimi-*`、`deepseek-*`、`mimo-*`、`hy3*` | `/chat/completions` |
 
 这里的 OpenCode 原生配置名写作 `opencode-go/<model-id>`；TMSH 为了区分同名连接，内部描述符仍写成 `<connection-id>.<model-id>`，例如默认连接名下的 `opencode-go.deepseek-v4-flash`。实际发送给 API 的原始模型 ID 仍是 `deepseek-v4-flash`。如果模型列表出现不属于上述已知协议族的新 ID，向导会失败关闭并要求先更新协议映射，不会猜测协议。
+
+OpenCode Go 的 Chat Completions 描述符带有 `opencode-go-chat-completions` capability。该兼容层只处理接口事实，不改变模型工作流：发送前校验 `assistant.tool_calls → tool result` 的 exactly-once 配对；provider 将双重编码 JSON 对象解析成字符串时，再进行一次仅限对象的无损恢复；assistant 的 reasoning part 原样保留。若本地历史已通过结构校验，而 OpenCode Go 仍返回“tool 缺少前置 tool_calls”“重复 tool_call_id”或“thinking mode 缺少 reasoning_content”这三类已观察到的 400，TMSH 会明确报告 `OpenCode Go compatibility error`，保留原错误且不自动重试。它不会伪造 reasoning、插入虚假 assistant 轮或把基建失败计作模型失败。
 
 提供商的模型列表通常不包含可靠的上下文长度、价格、视觉能力和工具调用能力元数据。向导不会编造这些数值：自动生成的描述会标记 `discovered` 和 `tool-use-unverified`，未知上下文容量将使比例式自动压缩保持关闭，用户可依据官方规格继续编辑 `tmsh.local.json`。
 
@@ -691,18 +695,23 @@ git diff --check
 
 本版本交付前已观察到：
 
-- 20 个测试文件、57 个测试通过；
+- 21 个测试文件、63 个测试通过，其中兼容性 fixture 会捕获真实 Chat Completions 第二轮请求，验证 reasoning 回传、并行工具 ID 配对、双重编码对象修复、发送前历史不变量和 OpenCode 错误分类；
 - TypeScript 类型检查、构建和格式检查通过；
 - DeepSeek 真实模型完成基础回复、工具调用和压缩 smoke；
 - OpenCode Go 真实 `/models` 枚举发现 `25` 个当前账户可见模型，其中自动归类为 Chat Completions `16`、Responses `1`、Messages `8`；`deepseek-v4-flash` 与 `deepseek-v4-pro` 均存在；
 - OpenCode Go `deepseek-v4-flash` 在原生 OpenTUI 中完成单轮与多工具多轮 smoke，无 ANSI fallback；
 - TMSH `147c740` 在 DeepSWE v1.1 `anko-default-function-arguments` 单模型正式 trial 获得 F2P `2/2`、P2P `119/119`、Partial `1.000`、Reward `1.0`、Exceptions `0`；该结果是 `n=1` 校准，不是 113 题总榜成绩；
+- 同一 OpenCode Go / `deepseek-v4-flash` / TMSH `147c740` 条件下，第二个有效 trial 获得 F2P `1/2`、P2P `119/119`、Partial `0.9917355371900827`、Reward `0`；两个有效 trial 合计为 `1/2`。随后一次串行恢复 campaign 的 9 次尝试全部因 provider tool-history 400 或未完成运行而无效，不能加入模型分母；
 - loopback API 健康检查、模型/工具枚举和 SSE 路径通过 smoke；
 - stdio MCP Server 可枚举 7 个控制工具；
 - 本机 Bun `1.3.14` 成功初始化 OpenTUI 原生 alternate-screen renderer；Node `v24.8.0` 缺少 `node:ffi` 时 ANSI 回退也通过 smoke；
 - adaptive-toolsmith 的普通与 Python `-O` 自检通过。
 
 这些是该提交形成前的观察结果，不代表任何未来环境、第三方 API 或新模型版本会自动保持兼容；修改实现后应重新运行相应测试和真实 smoke。
+
+### Benchmark 分组规则
+
+模型 ID 相同并不表示实验条件相同。至少应按 provider 路由、API 协议、TMSH commit、Node major、任务与 verifier 版本分别冻结；任一项变化都建立新的实验 epoch，旧结果只能并列呈现，不能合并分母。Reward `0` 且 agent/verifier 完整结束是有效模型结果；API 400、消息链不变量失败、容器异常或未完成 verifier 是无效基建尝试，不进入模型成功率。
 
 ## 安全边界
 

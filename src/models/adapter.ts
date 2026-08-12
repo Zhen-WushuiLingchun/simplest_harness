@@ -64,6 +64,7 @@ export class AiSdkModelAdapter implements ModelAdapter {
   }
 
   public async complete(input: ModelTurnInput): Promise<ModelTurnOutput> {
+    assertValidToolHistory(input.messages);
     const aliases = toolAliases(input.tools);
     const tools = Object.fromEntries(
       input.tools.map((item) => {
@@ -92,6 +93,8 @@ export class AiSdkModelAdapter implements ModelAdapter {
       ...(input.maxOutputTokens === undefined
         ? {}
         : { maxOutputTokens: input.maxOutputTokens }),
+    }).catch((error: unknown) => {
+      throw classifyProviderError(this.descriptor, error);
     });
     const toolCalls = result.toolCalls.map((call) => {
       const resolved = resolveProviderToolName(call.toolName, aliases);
@@ -99,7 +102,7 @@ export class AiSdkModelAdapter implements ModelAdapter {
         id: call.toolCallId,
         name: resolved.canonicalName,
         providerName: resolved.providerName,
-        input: toJsonValue(call.input),
+        input: normalizeParsedToolInput(call.input),
       };
     });
     return {
@@ -229,6 +232,30 @@ function toJsonValue(value: unknown): JsonValue {
 }
 
 /**
+ * Dynamic tools can expose a JSON object as a string after the provider layer
+ * has already parsed a double-encoded arguments field. Decode only that exact,
+ * lossless shape; tool inputs are objects, so arrays and scalar JSON remain
+ * untouched and fail through the normal tool boundary.
+ */
+export function normalizeParsedToolInput(input: unknown): JsonValue {
+  if (typeof input === "string") {
+    try {
+      const decoded: unknown = JSON.parse(input);
+      if (
+        decoded !== null &&
+        typeof decoded === "object" &&
+        !Array.isArray(decoded)
+      ) {
+        return toJsonValue(decoded);
+      }
+    } catch {
+      // The original string is retained for normal tool-schema rejection.
+    }
+  }
+  return toJsonValue(input);
+}
+
+/**
  * Some OpenAI-compatible gateways occasionally JSON-encode an already encoded
  * tool argument object. AI SDK then sees a JSON string where the tool schema
  * requires an object. Repair only that narrow, lossless shape and leave every
@@ -286,6 +313,95 @@ function normalizeResponseToolNames(
       }),
     };
   });
+}
+
+/**
+ * Validate the standard assistant tool-call -> tool-result contract before a
+ * provider sees the history. This catches local corruption without spending a
+ * request and makes a later provider rejection attributable to the provider
+ * compatibility boundary rather than an unchecked TMSH message sequence.
+ */
+export function assertValidToolHistory(
+  messages: readonly ModelMessage[],
+): void {
+  const seenCalls = new Set<string>();
+  const seenResults = new Set<string>();
+  const pending = new Set<string>();
+
+  for (const [index, message] of messages.entries()) {
+    if (message.role === "assistant") {
+      assertNoPendingBeforeMessage(pending, index, message.role);
+      if (typeof message.content === "string") continue;
+      for (const part of message.content) {
+        if (part.type !== "tool-call") continue;
+        if (seenCalls.has(part.toolCallId)) {
+          throw new Error(
+            `invalid model message history: duplicate tool call id ${part.toolCallId} at message[${index}]`,
+          );
+        }
+        seenCalls.add(part.toolCallId);
+        pending.add(part.toolCallId);
+      }
+      continue;
+    }
+
+    if (message.role === "tool") {
+      for (const part of message.content) {
+        if (part.type !== "tool-result") continue;
+        if (seenResults.has(part.toolCallId)) {
+          throw new Error(
+            `invalid model message history: duplicate tool result id ${part.toolCallId} at message[${index}]`,
+          );
+        }
+        if (!pending.has(part.toolCallId)) {
+          throw new Error(
+            `invalid model message history: orphan tool result ${part.toolCallId} at message[${index}]`,
+          );
+        }
+        seenResults.add(part.toolCallId);
+        pending.delete(part.toolCallId);
+      }
+      continue;
+    }
+
+    assertNoPendingBeforeMessage(pending, index, message.role);
+  }
+
+  if (pending.size > 0) {
+    throw new Error(
+      `invalid model message history: unresolved tool calls at end of history: ${[...pending].join(", ")}`,
+    );
+  }
+}
+
+function assertNoPendingBeforeMessage(
+  pending: ReadonlySet<string>,
+  index: number,
+  role: string,
+): void {
+  if (pending.size === 0) return;
+  throw new Error(
+    `invalid model message history: unresolved tool calls before ${role} message[${index}]: ${[...pending].join(", ")}`,
+  );
+}
+
+function classifyProviderError(
+  descriptor: ModelDescriptor,
+  error: unknown,
+): unknown {
+  if (!descriptor.capabilities.includes("opencode-go-chat-completions"))
+    return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const knownHistoryRejection = [
+    "Messages with role 'tool' must be a response to a preceding message with 'tool_calls'",
+    "Duplicate value for 'tool_call_id'",
+    "The `reasoning_content` in the thinking mode must be passed back to the API",
+  ].some((fragment) => message.includes(fragment));
+  if (!knownHistoryRejection) return error;
+  return new Error(
+    `OpenCode Go compatibility error: provider rejected tool-call history after TMSH structural validation; request was not retried. ${message}`,
+    { cause: error },
+  );
 }
 
 export function toolAliases(tools: readonly ToolSummary[]): {
